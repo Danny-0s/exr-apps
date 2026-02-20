@@ -36,7 +36,7 @@ import ReturnRefundPolicy from "./pages/policies/ReturnRefundPolicy";
 
 /* ===== ADMIN PAGES ===== */
 import AdminLogin from "./pages/admin/login";
-import Dashboard from "./pages/admin/dashboard";
+import Dashboard from "./pages/admin/Dashboard";
 import HomepageEditor from "./pages/admin/HomepageEditor";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminOrders from "./pages/admin/adminorders";

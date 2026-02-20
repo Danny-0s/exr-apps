@@ -17,12 +17,9 @@ import orderRoutes from "./routes/orderRoutes.js";
 import homepageRoutes from "./routes/homepageRoutes.js";
 import seoRoutes from "./routes/seoRoutes.js";
 import wishlistRoutes from "./routes/wishlistRoutes.js";
-
 import authRoutes from "./routes/authRoutes.js";
-
 import khaltiRoutes from "./routes/khaltiRoutes.js";
 import esewaRoutes from "./routes/esewaRoutes.js";
-
 import adminDashboardRoutes from "./routes/adminDashboardRoutes.js";
 import adminProductRoutes from "./routes/adminProductRoutes.js";
 import adminOrderRoutes from "./routes/adminOrderRoutes.js";
@@ -33,11 +30,7 @@ import adminUploadRoutes from "./routes/adminUpload.js";
 import adminRefreshRoutes from "./routes/adminRefresh.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
 import adminUserRoutes from "./routes/adminUserRoutes.js";
-
-/* 🔥 TEAM ROUTES */
 import adminTeamRoutes from "./routes/adminTeamRoutes.js";
-
-/* ===== PUBLIC COUPONS ===== */
 import couponPublicRoutes from "./routes/couponPublicRoutes.js";
 
 /* ================= MODELS ================= */
@@ -52,9 +45,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 connectDB();
 
 /* ================= CORS ================= */
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://exr-apps-1.onrender.com",
+];
+
 app.use(
     cors({
-        origin: "http://localhost:5173",
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
         credentials: true,
     })
 );
@@ -157,8 +162,6 @@ app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin/media", mediaRoutes);
 app.use("/api/admin/upload", adminUploadRoutes);
 app.use("/api/admin/users", adminUserRoutes);
-
-/* 🔥 TEAM MANAGEMENT ROUTE REGISTERED */
 app.use("/api/admin/team", adminTeamRoutes);
 
 /* ================= HEALTH ================= */
@@ -167,56 +170,35 @@ app.get("/", (_req, res) => {
 });
 
 /* =====================================================
-   🔥 ADMIN LOGIN (DATABASE BASED)
+   ADMIN LOGIN
 ===================================================== */
 app.post("/api/admin/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return res.status(400).json({
-                error: "Email and password required",
-            });
+            return res.status(400).json({ error: "Email and password required" });
         }
 
-        const admin = await Admin.findOne({
-            email: email.toLowerCase(),
-        });
+        const admin = await Admin.findOne({ email: email.toLowerCase() });
 
-        if (!admin) {
-            return res.status(401).json({
-                error: "Invalid credentials",
-            });
-        }
-
-        if (!admin.isActive) {
-            return res.status(403).json({
-                error: "Admin account disabled",
-            });
+        if (!admin || !admin.isActive) {
+            return res.status(401).json({ error: "Invalid credentials" });
         }
 
         const isMatch = await admin.matchPassword(password);
-
         if (!isMatch) {
-            return res.status(401).json({
-                error: "Invalid credentials",
-            });
+            return res.status(401).json({ error: "Invalid credentials" });
         }
 
         const accessToken = jwt.sign(
-            {
-                adminId: admin._id,
-                role: admin.role,
-            },
+            { adminId: admin._id, role: admin.role },
             process.env.ADMIN_JWT_SECRET,
             { expiresIn: "15m" }
         );
 
         const refreshToken = jwt.sign(
-            {
-                adminId: admin._id,
-                role: admin.role,
-            },
+            { adminId: admin._id, role: admin.role },
             process.env.ADMIN_REFRESH_SECRET,
             { expiresIn: "7d" }
         );
@@ -231,12 +213,9 @@ app.post("/api/admin/login", async (req, res) => {
                 role: admin.role,
             },
         });
-
     } catch (err) {
         console.error("ADMIN LOGIN ERROR:", err);
-        res.status(500).json({
-            error: "Login failed",
-        });
+        res.status(500).json({ error: "Login failed" });
     }
 });
 
@@ -247,15 +226,12 @@ app.post("/create-checkout-session", async (req, res) => {
     try {
         const { items, orderId } = req.body;
 
-        if (!orderId) {
-            return res.status(400).json({ error: "OrderId missing" });
-        }
+        const FRONTEND_URL =
+            process.env.NODE_ENV === "production"
+                ? "https://exr-apps-1.onrender.com"
+                : "http://localhost:5173";
 
-        if (!items || items.length === 0) {
-            return res.status(400).json({ error: "No items provided" });
-        }
-
-        const line_items = items.map(item => ({
+        const line_items = items.map((item) => ({
             price_data: {
                 currency: "usd",
                 product_data: { name: item.title },
@@ -268,8 +244,8 @@ app.post("/create-checkout-session", async (req, res) => {
             payment_method_types: ["card"],
             line_items,
             mode: "payment",
-            success_url: `http://localhost:5173/success/${orderId}`,
-            cancel_url: "http://localhost:5173/cart",
+            success_url: `${FRONTEND_URL}/success/${orderId}`,
+            cancel_url: `${FRONTEND_URL}/cart`,
             metadata: { orderId },
         });
 
@@ -278,7 +254,6 @@ app.post("/create-checkout-session", async (req, res) => {
         });
 
         res.json({ url: session.url });
-
     } catch (err) {
         console.error("STRIPE SESSION ERROR:", err);
         res.status(500).json({ error: "Stripe session failed" });
@@ -286,6 +261,8 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 /* ================= START SERVER ================= */
-app.listen(4242, () => {
-    console.log("🚀 Backend running on http://localhost:4242");
+const PORT = process.env.PORT || 4242;
+
+app.listen(PORT, () => {
+    console.log(`🚀 Backend running on port ${PORT}`);
 });

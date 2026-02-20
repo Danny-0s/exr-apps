@@ -1,3 +1,3 @@
-const API_BASE = "http://localhost:4242";
+const API_BASE_URL = "https://exr-apps.onrender.com";
 
 export default API_BASE;

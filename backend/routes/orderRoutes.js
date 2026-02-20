@@ -4,7 +4,7 @@ import Order from "../models/order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
-import User from "../models/User.js";
+import User from "../models/TempUserModel.js";
 import { userAuth } from "../middleware/userAuth.js";
 
 const router = express.Router();

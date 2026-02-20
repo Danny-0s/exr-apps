@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import SectionRenderer from "../components/homepage/SectionRenderer";
 import SplitHero from "../components/SplitHero";
+import API_BASE_URL from "../utils/api";   // ✅ ADD THIS
 
 export default function Home() {
     const [sections, setSections] = useState([]);
@@ -11,7 +12,7 @@ export default function Home() {
 
         const load = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/homepage");
+                const res = await fetch(`${API_BASE_URL}/api/homepage`);
                 const data = await res.json();
 
                 if (!mounted) return;

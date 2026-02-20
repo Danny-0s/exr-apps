@@ -1,5 +1,5 @@
 import express from "express";
-import User from "../models/TempUserModel.js";
+import User from "../models/User.js";
 import Product from "../models/Product.js";
 import { userAuth } from "../middleware/userAuth.js";
 

@@ -4,13 +4,13 @@ import Coupon from "../models/Coupon.js";
 const router = express.Router();
 
 /* ===============================
-   VALIDATE COUPON (PUBLIC)
+   APPLY COUPON (PUBLIC)
+   Used by cart.jsx
 ================================ */
-router.post("/validate", async (req, res) => {
+router.post("/apply", async (req, res) => {
     try {
         const { code, subtotal } = req.body;
 
-        /* ================= VALIDATION ================= */
         if (!code || subtotal === undefined) {
             return res.status(400).json({
                 error: "Coupon code and subtotal required",
@@ -61,37 +61,37 @@ router.post("/validate", async (req, res) => {
         }
 
         /* ================= DISCOUNT LOGIC ================= */
-        let discount = 0;
+        let discountAmount = 0;
 
         if (coupon.type === "fixed") {
-            discount = coupon.value;
+            discountAmount = coupon.value;
         }
 
         if (coupon.type === "percent") {
-            discount = Math.round(
+            discountAmount = Math.round(
                 (safeSubtotal * coupon.value) / 100
             );
         }
 
-        // Prevent negative totals
-        if (discount > safeSubtotal) {
-            discount = safeSubtotal;
+        if (discountAmount > safeSubtotal) {
+            discountAmount = safeSubtotal;
         }
 
-        const finalTotal = safeSubtotal - discount;
+        const finalTotal = safeSubtotal - discountAmount;
 
-        res.json({
-            valid: true,
+        return res.json({
+            success: true,
             code: coupon.code,
             type: coupon.type,
             value: coupon.value,
-            discount,
+            discountAmount,
             finalTotal,
         });
+
     } catch (err) {
-        console.error("COUPON VALIDATION ERROR:", err);
-        res.status(500).json({
-            error: "Failed to validate coupon",
+        console.error("COUPON APPLY ERROR:", err);
+        return res.status(500).json({
+            error: "Failed to apply coupon",
         });
     }
 });

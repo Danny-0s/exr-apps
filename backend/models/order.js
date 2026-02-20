@@ -1,14 +1,32 @@
 import mongoose from "mongoose";
 
+const refundTimelineSchema = new mongoose.Schema(
+    {
+        status: {
+            type: String,
+            required: true,
+        },
+        note: {
+            type: String,
+            default: "",
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
     {
         /* ===============================
-           USER (SAFE FOR GUEST + LOGIN)
+           USER (LOGIN REQUIRED)
         ================================ */
-        userId: {
+        user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            default: null, // allows guest checkout
+            default: null,
         },
 
         /* ===============================
@@ -61,7 +79,7 @@ const orderSchema = new mongoose.Schema(
         ================================ */
         paymentMethod: {
             type: String,
-            enum: ["stripe", "cod", "esewa", "khalti"],
+            enum: ["stripe", "cod", "esewa", "khalti", "wallet"],
             required: true,
         },
 
@@ -85,6 +103,7 @@ const orderSchema = new mongoose.Schema(
                 "shipped",
                 "delivered",
                 "cancelled",
+                "refunded", // 🔥 added
             ],
             default: "pending",
         },
@@ -113,7 +132,7 @@ const orderSchema = new mongoose.Schema(
         },
 
         /* ===============================
-           REFUND & RETURN META
+           REFUND META
         ================================ */
         refundRequested: {
             type: Boolean,
@@ -142,6 +161,11 @@ const orderSchema = new mongoose.Schema(
             default: "none",
         },
 
+        refundRejectReason: {
+            type: String,
+            default: null,
+        },
+
         refundMethod: {
             type: String,
             enum: ["wallet", "original_payment", null],
@@ -163,10 +187,35 @@ const orderSchema = new mongoose.Schema(
             ref: "Admin",
             default: null,
         },
+
+        /* ===============================
+           REFUND TIMELINE
+        ================================ */
+        refundTimeline: [refundTimelineSchema],
+
+        /* ===============================
+           ANALYTICS FLAGS
+        ================================ */
+        analytics: {
+            refundProcessed: {
+                type: Boolean,
+                default: false,
+            },
+        },
     },
     {
         timestamps: true,
     }
 );
+
+/* =========================================
+   HELPER: ADD REFUND TIMELINE ENTRY
+========================================= */
+orderSchema.methods.addRefundTimeline = function (status, note = "") {
+    this.refundTimeline.push({
+        status,
+        note,
+    });
+};
 
 export default mongoose.model("Order", orderSchema);

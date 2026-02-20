@@ -10,20 +10,19 @@ import path from "path";
 import connectDB from "./config/db.js";
 
 /* ================= ROUTES ================= */
+import adminLogRoutes from "./routes/adminLogRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import homepageRoutes from "./routes/homepageRoutes.js";
 import seoRoutes from "./routes/seoRoutes.js";
+import wishlistRoutes from "./routes/wishlistRoutes.js";
 
-/* ===== USER AUTH ROUTES ===== */
 import authRoutes from "./routes/authRoutes.js";
 
-/* ===== PAYMENT ROUTES ===== */
 import khaltiRoutes from "./routes/khaltiRoutes.js";
 import esewaRoutes from "./routes/esewaRoutes.js";
 
-/* ===== ADMIN ROUTES ===== */
 import adminDashboardRoutes from "./routes/adminDashboardRoutes.js";
 import adminProductRoutes from "./routes/adminProductRoutes.js";
 import adminOrderRoutes from "./routes/adminOrderRoutes.js";
@@ -33,9 +32,10 @@ import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
 import adminUploadRoutes from "./routes/adminUpload.js";
 import adminRefreshRoutes from "./routes/adminRefresh.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
-
-/* ✅ NEW: ADMIN USERS ROUTE */
 import adminUserRoutes from "./routes/adminUserRoutes.js";
+
+/* 🔥 TEAM ROUTES */
+import adminTeamRoutes from "./routes/adminTeamRoutes.js";
 
 /* ===== PUBLIC COUPONS ===== */
 import couponPublicRoutes from "./routes/couponPublicRoutes.js";
@@ -43,6 +43,7 @@ import couponPublicRoutes from "./routes/couponPublicRoutes.js";
 /* ================= MODELS ================= */
 import Order from "./models/order.js";
 import Settings from "./models/Settings.js";
+import Admin from "./models/Admin.js";
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -59,7 +60,7 @@ app.use(
 );
 
 /* =====================================================
-   STRIPE WEBHOOK (MUST BE BEFORE express.json())
+   STRIPE WEBHOOK (BEFORE JSON PARSER)
 ===================================================== */
 app.post(
     "/api/stripe/webhook",
@@ -135,15 +136,17 @@ app.use("/api/homepage", homepageRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/seo", seoRoutes);
 app.use("/api/coupons", couponPublicRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
-/* ================= USER AUTH API ================= */
+/* ================= USER AUTH ================= */
 app.use("/api/auth", authRoutes);
 
-/* ================= PAYMENT API ================= */
+/* ================= PAYMENT ================= */
 app.use("/api/payments/khalti", khaltiRoutes);
 app.use("/api/payments/esewa", esewaRoutes);
 
 /* ================= ADMIN API ================= */
+app.use("/api/admin/logs", adminLogRoutes);
 app.use("/api/admin/refresh", adminRefreshRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin/products", adminProductRoutes);
@@ -153,58 +156,119 @@ app.use("/api/admin/coupons", adminCouponRoutes);
 app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin/media", mediaRoutes);
 app.use("/api/admin/upload", adminUploadRoutes);
-
-/* ✅ NEW: ADMIN USERS ENDPOINT */
 app.use("/api/admin/users", adminUserRoutes);
+
+/* 🔥 TEAM MANAGEMENT ROUTE REGISTERED */
+app.use("/api/admin/team", adminTeamRoutes);
 
 /* ================= HEALTH ================= */
 app.get("/", (_req, res) => {
     res.send("Backend running ✅");
 });
 
-/* ================= ADMIN LOGIN ================= */
-app.post("/api/admin/login", (req, res) => {
-    const { email, password } = req.body;
+/* =====================================================
+   🔥 ADMIN LOGIN (DATABASE BASED)
+===================================================== */
+app.post("/api/admin/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-    if (
-        email !== process.env.ADMIN_EMAIL ||
-        password !== process.env.ADMIN_PASSWORD
-    ) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        if (!email || !password) {
+            return res.status(400).json({
+                error: "Email and password required",
+            });
+        }
+
+        const admin = await Admin.findOne({
+            email: email.toLowerCase(),
+        });
+
+        if (!admin) {
+            return res.status(401).json({
+                error: "Invalid credentials",
+            });
+        }
+
+        if (!admin.isActive) {
+            return res.status(403).json({
+                error: "Admin account disabled",
+            });
+        }
+
+        const isMatch = await admin.matchPassword(password);
+
+        if (!isMatch) {
+            return res.status(401).json({
+                error: "Invalid credentials",
+            });
+        }
+
+        const accessToken = jwt.sign(
+            {
+                adminId: admin._id,
+                role: admin.role,
+            },
+            process.env.ADMIN_JWT_SECRET,
+            { expiresIn: "15m" }
+        );
+
+        const refreshToken = jwt.sign(
+            {
+                adminId: admin._id,
+                role: admin.role,
+            },
+            process.env.ADMIN_REFRESH_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.json({
+            accessToken,
+            refreshToken,
+            admin: {
+                id: admin._id,
+                name: admin.name,
+                email: admin.email,
+                role: admin.role,
+            },
+        });
+
+    } catch (err) {
+        console.error("ADMIN LOGIN ERROR:", err);
+        res.status(500).json({
+            error: "Login failed",
+        });
     }
-
-    const accessToken = jwt.sign(
-        { role: "admin" },
-        process.env.ADMIN_JWT_SECRET,
-        { expiresIn: "15m" }
-    );
-
-    const refreshToken = jwt.sign(
-        { role: "admin" },
-        process.env.ADMIN_REFRESH_SECRET,
-        { expiresIn: "7d" }
-    );
-
-    res.json({ accessToken, refreshToken });
 });
 
-/* ================= STRIPE CHECKOUT ================= */
+/* =====================================================
+   STRIPE CHECKOUT SESSION
+===================================================== */
 app.post("/create-checkout-session", async (req, res) => {
     try {
         const { items, orderId } = req.body;
 
+        if (!orderId) {
+            return res.status(400).json({ error: "OrderId missing" });
+        }
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: "No items provided" });
+        }
+
+        const line_items = items.map(item => ({
+            price_data: {
+                currency: "usd",
+                product_data: { name: item.title },
+                unit_amount: Math.round(item.price * 100),
+            },
+            quantity: item.quantity || 1,
+        }));
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
-            line_items: items.map(item => ({
-                price_data: {
-                    currency: "usd",
-                    product_data: { name: item.title },
-                    unit_amount: item.price * 100,
-                },
-                quantity: item.quantity,
-            })),
+            line_items,
             mode: "payment",
-            success_url: "http://localhost:5173/success",
+            success_url: `http://localhost:5173/success/${orderId}`,
             cancel_url: "http://localhost:5173/cart",
             metadata: { orderId },
         });
@@ -214,6 +278,7 @@ app.post("/create-checkout-session", async (req, res) => {
         });
 
         res.json({ url: session.url });
+
     } catch (err) {
         console.error("STRIPE SESSION ERROR:", err);
         res.status(500).json({ error: "Stripe session failed" });

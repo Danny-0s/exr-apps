@@ -93,11 +93,10 @@ const adminWalletSchema = new mongoose.Schema(
 /* ===============================
    SAFETY: NEVER NEGATIVE BALANCE
 ================================ */
-adminWalletSchema.pre("save", function (next) {
+adminWalletSchema.pre("save", function () {
     if (this.balance < 0) {
         this.balance = 0;
     }
-    next();
 });
 
 /* ===============================

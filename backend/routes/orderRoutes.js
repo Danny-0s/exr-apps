@@ -4,12 +4,17 @@ import Order from "../models/order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
+import User from "../models/user.js";
 import { userAuth } from "../middleware/userAuth.js";
 
 const router = express.Router();
 
 /* ===================================================
-   CREATE ORDER (LOGIN REQUIRED)
+   CREATE ORDER
+   ✅ WALLET SUPPORTED
+   ✅ SAFE STOCK
+   ✅ SAFE COUPON
+   ✅ TRANSACTION SAFE
 =================================================== */
 router.post("/", userAuth, async (req, res) => {
     const session = await mongoose.startSession();
@@ -19,55 +24,27 @@ router.post("/", userAuth, async (req, res) => {
         const {
             items,
             shipping,
-            totalAmount,
             paymentMethod = "cod",
             coupon = null,
         } = req.body;
 
-        /* ================= SETTINGS ================= */
         const settings = await Settings.getSingleton();
 
         if (settings.maintenanceMode) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(503).json({
-                error: "Store is under maintenance",
-            });
+            throw new Error("Store is under maintenance");
         }
 
-        /* ================= PAYMENT CHECK ================= */
-        const paymentMap = {
-            cod: settings.codEnabled,
-            stripe: settings.stripeEnabled,
-            esewa: settings.esewaEnabled,
-            khalti: settings.khaltiEnabled,
-        };
-
-        if (!paymentMap[paymentMethod]) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: `${paymentMethod} payments are disabled`,
-            });
+        if (!Array.isArray(items) || items.length === 0 || !shipping) {
+            throw new Error("Invalid order data");
         }
 
-        /* ================= VALIDATION ================= */
-        if (
-            !Array.isArray(items) ||
-            items.length === 0 ||
-            !shipping ||
-            typeof totalAmount !== "number"
-        ) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: "Invalid order data",
-            });
-        }
+        /* ===============================
+           STOCK CHECK + SUBTOTAL
+        ================================ */
+        let subtotal = 0;
 
-        /* ================= STOCK CHECK ================= */
         for (const item of items) {
-            const updated = await Product.findOneAndUpdate(
+            const product = await Product.findOneAndUpdate(
                 {
                     _id: item._id,
                     stock: { $gte: item.quantity },
@@ -76,41 +53,55 @@ router.post("/", userAuth, async (req, res) => {
                 { new: true, session }
             );
 
-            if (!updated) {
-                await session.abortTransaction();
-                session.endSession();
-                return res.status(400).json({
-                    error: `Insufficient stock for ${item.title}`,
-                });
+            if (!product) {
+                throw new Error(
+                    `Insufficient stock for ${item.title}`
+                );
             }
+
+            subtotal += product.price * item.quantity;
         }
 
-        /* ================= COUPON ================= */
+        /* ===============================
+           COUPON VALIDATION
+        ================================ */
         let appliedCoupon = null;
+        let discountAmount = 0;
 
         if (coupon?.code) {
             const couponDoc = await Coupon.findOne({
-                code: coupon.code,
+                code: coupon.code.toUpperCase().trim(),
                 active: true,
             }).session(session);
 
-            if (!couponDoc) {
-                await session.abortTransaction();
-                session.endSession();
-                return res.status(400).json({
-                    error: "Coupon invalid",
-                });
+            if (!couponDoc) throw new Error("Invalid coupon");
+
+            if (
+                couponDoc.expiresAt &&
+                new Date(couponDoc.expiresAt) < new Date()
+            ) {
+                throw new Error("Coupon expired");
             }
 
             if (
                 couponDoc.maxUses !== null &&
                 couponDoc.usedCount >= couponDoc.maxUses
             ) {
-                await session.abortTransaction();
-                session.endSession();
-                return res.status(400).json({
-                    error: "Coupon limit reached",
-                });
+                throw new Error("Coupon usage limit reached");
+            }
+
+            if (couponDoc.type === "fixed") {
+                discountAmount = couponDoc.value;
+            }
+
+            if (couponDoc.type === "percent") {
+                discountAmount = Math.round(
+                    (subtotal * couponDoc.value) / 100
+                );
+            }
+
+            if (discountAmount > subtotal) {
+                discountAmount = subtotal;
             }
 
             couponDoc.usedCount += 1;
@@ -120,26 +111,80 @@ router.post("/", userAuth, async (req, res) => {
                 code: couponDoc.code,
                 type: couponDoc.type,
                 value: couponDoc.value,
-                discount: coupon.discount || 0,
+                discount: discountAmount,
             };
         }
 
-        /* ================= CREATE ORDER ================= */
+        const finalTotal = subtotal - discountAmount;
+
+        /* ===================================================
+           💰 WALLET PAYMENT
+        =================================================== */
+        let paymentStatus = "pending";
+        let orderStatus = "pending";
+
+        if (paymentMethod === "wallet") {
+            const user = await User.findById(
+                req.user.userId
+            ).session(session);
+
+            if (!user) throw new Error("User not found");
+
+            if (user.walletBalance < finalTotal) {
+                throw new Error("Insufficient wallet balance");
+            }
+
+            // ✅ USE YOUR HELPER METHOD
+            user.debitWallet(
+                finalTotal,
+                null,
+                "Wallet payment for order"
+            );
+
+            await user.save({ session });
+
+            paymentStatus = "paid";
+            orderStatus = "paid";
+        }
+
+        /* ===============================
+           CREATE ORDER
+        ================================ */
         const [order] = await Order.create(
             [
                 {
-                    user: req.user.userId,
+                    userId: req.user.userId,
                     items,
                     shipping,
-                    totalAmount,
+                    totalAmount: finalTotal,
                     paymentMethod,
-                    paymentStatus: "pending",
-                    orderStatus: "pending",
+                    paymentStatus,
+                    orderStatus,
                     coupon: appliedCoupon,
                 },
             ],
             { session }
         );
+
+        /* ===============================
+           LINK WALLET TRANSACTION TO ORDER
+        ================================ */
+        if (paymentMethod === "wallet") {
+            const user = await User.findById(
+                req.user.userId
+            ).session(session);
+
+            const lastTx =
+                user.walletTransactions[
+                user.walletTransactions.length - 1
+                ];
+
+            if (lastTx) {
+                lastTx.relatedOrder = order._id;
+            }
+
+            await user.save({ session });
+        }
 
         await session.commitTransaction();
         session.endSession();
@@ -148,12 +193,15 @@ router.post("/", userAuth, async (req, res) => {
             success: true,
             orderId: order._id,
         });
+
     } catch (err) {
         await session.abortTransaction();
         session.endSession();
+
         console.error("CREATE ORDER ERROR:", err);
-        return res.status(500).json({
-            error: "Failed to create order",
+
+        return res.status(400).json({
+            error: err.message || "Failed to create order",
         });
     }
 });
@@ -164,18 +212,16 @@ router.post("/", userAuth, async (req, res) => {
 router.get("/my-orders", userAuth, async (req, res) => {
     try {
         const orders = await Order.find({
-            user: req.user.userId,
-        })
-            .sort({ createdAt: -1 })
-            .populate("user", "name email");
+            userId: req.user.userId,
+        }).sort({ createdAt: -1 });
 
-        return res.json({
+        res.json({
             success: true,
             orders,
         });
     } catch (err) {
         console.error("FETCH MY ORDERS ERROR:", err);
-        return res.status(500).json({
+        res.status(500).json({
             error: "Failed to fetch orders",
         });
     }
@@ -190,7 +236,7 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
 
         const order = await Order.findOne({
             _id: req.params.id,
-            user: req.user.userId,
+            userId: req.user.userId,
         });
 
         if (!order) {
@@ -217,30 +263,21 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             });
         }
 
-        const now = new Date();
-        const daysPassed =
-            (now - order.updatedAt) / (1000 * 60 * 60 * 24);
-
-        if (daysPassed > 7) {
-            return res.status(400).json({
-                error: "Refund window expired",
-            });
-        }
-
         order.refundRequested = true;
-        order.refundRequestedAt = now;
+        order.refundRequestedAt = new Date();
         order.refundReason = reason;
         order.refundStatus = "requested";
 
         await order.save();
 
-        return res.json({
+        res.json({
             success: true,
             message: "Refund request submitted",
         });
+
     } catch (err) {
         console.error("REFUND REQUEST ERROR:", err);
-        return res.status(500).json({
+        res.status(500).json({
             error: "Failed to submit refund request",
         });
     }
@@ -253,7 +290,7 @@ router.get("/:id", userAuth, async (req, res) => {
     try {
         const order = await Order.findOne({
             _id: req.params.id,
-            user: req.user.userId,
+            userId: req.user.userId,
         });
 
         if (!order) {
@@ -262,10 +299,11 @@ router.get("/:id", userAuth, async (req, res) => {
             });
         }
 
-        return res.json(order);
+        res.json(order);
+
     } catch (err) {
         console.error("FETCH ORDER ERROR:", err);
-        return res.status(500).json({
+        res.status(500).json({
             error: "Failed to load order",
         });
     }

@@ -1,6 +1,10 @@
 import express from "express";
 import Order from "../models/order.js";
+<<<<<<< HEAD
 import User from "../models/User.js";
+=======
+import User from "../models/UserModel.js";
+>>>>>>> 4462b3f
 import AdminWallet from "../models/AdminWallet.js";
 import adminAuth from "../middleware/adminAuth.js";
 import nodemailer from "nodemailer";

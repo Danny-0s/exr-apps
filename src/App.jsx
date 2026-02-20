@@ -2,17 +2,17 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AdminRoute from "./components/AdminRoute";
 
 /* ===== LAYOUTS ===== */
-import AdminLayout from "./layouts/AdminLayout";
-import StoreLayout from "./layouts/StoreLayout";
+import AdminLayout from "./layouts/adminlayout";
+import StoreLayout from "./layouts/storelayout";
 
 /* ===== PUBLIC STORE PAGES ===== */
-import Home from "./pages/home";
+import Home from "./pages/Home";
 import Products from "./pages/products";
 import ProductDetails from "./pages/productdetails";
 import Cart from "./pages/cart";
 import Checkout from "./pages/checkout";
 import Success from "./pages/success";
-import Contact from "./pages/contact";
+import Contact from "./pages/Contact";
 import Profiles from "./pages/profiles";
 
 /* SHOP */
@@ -36,7 +36,7 @@ import ReturnRefundPolicy from "./pages/policies/ReturnRefundPolicy";
 
 /* ===== ADMIN PAGES ===== */
 import AdminLogin from "./pages/admin/login";
-import Dashboard from "./pages/admin/dashboard";
+import Dashboard from "./pages/admin/Dashboard";
 import HomepageEditor from "./pages/admin/HomepageEditor";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminOrders from "./pages/admin/adminorders";
@@ -62,7 +62,7 @@ export default function App() {
     <Routes>
 
       {/* ================= STORE ================= */}
-      <Route element={<StoreLayout />}>
+      <Route element={<storelayout />}>
 
         <Route path="/" element={<Home />} />
 
@@ -135,7 +135,7 @@ export default function App() {
         path="/admin"
         element={
           <AdminRoute>
-            <AdminLayout />
+            <adminlayout />
           </AdminRoute>
         }
       >

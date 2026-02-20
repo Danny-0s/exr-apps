@@ -62,7 +62,7 @@ export default function App() {
     <Routes>
 
       {/* ================= STORE ================= */}
-      <Route element={<storelayout />}>
+      <Route element={<StoreLayout />}>
 
         <Route path="/" element={<Home />} />
 
@@ -135,7 +135,7 @@ export default function App() {
         path="/admin"
         element={
           <AdminRoute>
-            <adminlayout />
+            <AdminLayout />
           </AdminRoute>
         }
       >

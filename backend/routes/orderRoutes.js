@@ -4,11 +4,7 @@ import Order from "../models/order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
-<<<<<<< HEAD
 import User from "../models/User.js";
-=======
-import User from "../models/UserModel.js";
->>>>>>> 4462b3f
 import { userAuth } from "../middleware/userAuth.js";
 
 const router = express.Router();

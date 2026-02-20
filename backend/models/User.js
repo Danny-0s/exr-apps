@@ -1,5 +1,60 @@
 import mongoose from "mongoose";
 
+/* =========================================
+   WALLET TRANSACTION SCHEMA
+========================================= */
+const walletTransactionSchema = new mongoose.Schema(
+    {
+        type: {
+            type: String,
+            enum: ["refund", "purchase", "admin_credit"],
+            required: true,
+        },
+        amount: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        relatedOrder: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Order",
+        },
+        note: {
+            type: String,
+            default: "",
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    { _id: false }
+);
+
+/* =========================================
+   ADMIN ACTIVITY LOG SCHEMA
+========================================= */
+const activityLogSchema = new mongoose.Schema(
+    {
+        action: {
+            type: String,
+            required: true,
+        },
+        details: {
+            type: String,
+            default: "",
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    { _id: false }
+);
+
+/* =========================================
+   USER SCHEMA
+========================================= */
 const userSchema = new mongoose.Schema(
     {
         /* ===============================
@@ -25,7 +80,53 @@ const userSchema = new mongoose.Schema(
         },
 
         /* ===============================
-           WALLET (REFUND CREDIT SYSTEM)
+           ROLE SYSTEM
+        ================================ */
+        role: {
+            type: String,
+            enum: [
+                "customer",
+                "admin",
+                "editor",
+                "support",
+                "finance",
+                "owner",
+            ],
+            default: "customer",
+        },
+
+        lastLogin: {
+            type: Date,
+            default: null,
+        },
+
+        activityLog: [activityLogSchema],
+
+        /* ===============================
+           PHONE VERIFICATION
+        ================================ */
+        phone: {
+            type: String,
+            default: "",
+        },
+
+        phoneVerified: {
+            type: Boolean,
+            default: false,
+        },
+
+        phoneOTP: {
+            type: String,
+            default: null,
+        },
+
+        phoneOTPExpires: {
+            type: Date,
+            default: null,
+        },
+
+        /* ===============================
+           WALLET
         ================================ */
         walletBalance: {
             type: Number,
@@ -33,23 +134,10 @@ const userSchema = new mongoose.Schema(
             min: 0,
         },
 
-        walletTransactions: [
-            {
-                type: {
-                    type: String,
-                    enum: ["refund", "admin_credit", "purchase"],
-                },
-                amount: Number,
-                note: String,
-                createdAt: {
-                    type: Date,
-                    default: Date.now,
-                },
-            },
-        ],
+        walletTransactions: [walletTransactionSchema],
 
         /* ===============================
-           WISHLIST (REAL WORKING)
+           WISHLIST
         ================================ */
         wishlist: [
             {
@@ -59,7 +147,7 @@ const userSchema = new mongoose.Schema(
         ],
 
         /* ===============================
-           COUPONS OWNED BY USER
+           USER COUPONS
         ================================ */
         coupons: [
             {
@@ -86,4 +174,59 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-export default mongoose.model("User", userSchema);
+/* =========================================
+   HELPER METHODS
+========================================= */
+
+/* ➕ Credit wallet */
+userSchema.methods.creditWallet = function (
+    amount,
+    orderId = null,
+    note = ""
+) {
+    this.walletBalance += amount;
+
+    this.walletTransactions.push({
+        type: "refund",
+        amount,
+        relatedOrder: orderId,
+        note,
+    });
+};
+
+/* ➖ Debit wallet */
+userSchema.methods.debitWallet = function (
+    amount,
+    orderId = null,
+    note = ""
+) {
+    if (this.walletBalance < amount) {
+        throw new Error("Insufficient wallet balance");
+    }
+
+    this.walletBalance -= amount;
+
+    this.walletTransactions.push({
+        type: "purchase",
+        amount,
+        relatedOrder: orderId,
+        note,
+    });
+};
+
+/* 📝 Add Activity Log */
+userSchema.methods.logActivity = function (action, details = "") {
+    this.activityLog.push({
+        action,
+        details,
+    });
+};
+
+/* =========================================
+   SAFE MODEL EXPORT (NO OVERWRITE ERROR)
+========================================= */
+const User =
+    mongoose.models.User ||
+    mongoose.model("User", userSchema);
+
+export default User;

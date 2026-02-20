@@ -1,30 +1,75 @@
 import express from "express";
-import mongoose from "mongoose";
 import Order from "../models/order.js";
-import Product from "../models/Product.js";
+import User from "../models/user.js";
 import AdminWallet from "../models/AdminWallet.js";
 import adminAuth from "../middleware/adminAuth.js";
+import nodemailer from "nodemailer";
 
 const router = express.Router();
 
-/* ===============================
-   GET ALL ORDERS (ADMIN)
-================================ */
-router.get("/", adminAuth, async (_req, res) => {
+/* ========================================
+   EMAIL TRANSPORTER
+======================================== */
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: Number(process.env.EMAIL_PORT),
+    secure: false,
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
+
+/* ========================================
+   EMAIL TEMPLATE
+======================================== */
+const refundEmailTemplate = (type, orderId, amount, reason = "") => {
+    if (type === "approved") {
+        return {
+            subject: "Your Refund Has Been Approved 🎉",
+            html: `
+                <div style="font-family: Arial; background:#111; padding:30px; color:#fff;">
+                    <h2 style="color:#4ade80;">Refund Approved</h2>
+                    <p>Your refund for order <b>${orderId}</b> has been approved.</p>
+                    <p><b>Amount Credited:</b> NPR ${amount}</p>
+                    <p>The amount has been added to your wallet.</p>
+                    <br/>
+                    <p>Thank you for shopping with EXR.</p>
+                </div>
+            `,
+        };
+    }
+
+    return {
+        subject: "Your Refund Request Was Rejected",
+        html: `
+            <div style="font-family: Arial; background:#111; padding:30px; color:#fff;">
+                <h2 style="color:#f87171;">Refund Rejected</h2>
+                <p>Your refund request for order <b>${orderId}</b> was rejected.</p>
+                <p><b>Reason:</b> ${reason}</p>
+                <br/>
+                <p>If you have questions, contact support.</p>
+            </div>
+        `,
+    };
+};
+
+/* ========================================
+   GET ALL ORDERS
+======================================== */
+router.get("/", adminAuth(), async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
-        res.json(orders);
+        res.json({ success: true, orders });
     } catch (err) {
-        console.error("FETCH ORDERS ERROR:", err);
         res.status(500).json({ error: "Failed to fetch orders" });
     }
 });
 
-/* ===============================
-   UPDATE ORDER STATUS (ADMIN)
-   ❌ NO REFUNDS HERE
-================================ */
-router.patch("/:id/status", adminAuth, async (req, res) => {
+/* ========================================
+   UPDATE ORDER STATUS
+======================================== */
+router.patch("/:id/status", adminAuth(), async (req, res) => {
     try {
         const { status } = req.body;
 
@@ -34,10 +79,11 @@ router.patch("/:id/status", adminAuth, async (req, res) => {
             "shipped",
             "delivered",
             "cancelled",
+            "refunded",
         ];
 
         if (!allowedStatuses.includes(status)) {
-            return res.status(400).json({ error: "Invalid order status" });
+            return res.status(400).json({ error: "Invalid status" });
         }
 
         const order = await Order.findById(req.params.id);
@@ -45,124 +91,167 @@ router.patch("/:id/status", adminAuth, async (req, res) => {
             return res.status(404).json({ error: "Order not found" });
         }
 
-        if (order.orderStatus === "cancelled") {
-            return res
-                .status(400)
-                .json({ error: "Cancelled orders cannot be modified" });
-        }
-
-        if (status === "paid") {
-            order.paymentStatus = "paid";
-        }
-
         order.orderStatus = status;
         await order.save();
 
-        res.json(order);
+        res.json({ success: true, order });
     } catch (err) {
-        console.error("UPDATE ORDER STATUS ERROR:", err);
-        res.status(500).json({ error: "Failed to update order status" });
+        res.status(500).json({ error: "Failed to update status" });
     }
 });
 
-/* ===============================
-   ISSUE STORE CREDIT REFUND (ADMIN)
-================================ */
-router.post("/:id/refund-wallet", adminAuth, async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+/* ========================================
+   APPROVE REFUND
+======================================== */
+router.put("/refund/:orderId", adminAuth(), async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id).session(session);
-        if (!order) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(404).json({ error: "Order not found" });
+        const order = await Order.findById(req.params.orderId);
+        if (!order) return res.status(404).json({ error: "Order not found" });
+
+        if (order.orderStatus === "refunded") {
+            return res.status(400).json({ error: "Already refunded" });
         }
 
-        // Must be requested first
-        if (!order.refundRequested || order.refundStatus !== "requested") {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: "Refund has not been requested by customer",
-            });
+        if (order.paymentStatus !== "paid") {
+            return res.status(400).json({ error: "Only paid orders refundable" });
         }
 
-        // Policy enforcement
-        if (
-            order.refundReason === "change_of_mind" ||
-            order.refundReason === "size_issue"
-        ) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: "This order is not eligible for wallet refund",
-            });
-        }
+        const user = await User.findById(order.user);
+        if (!user) return res.status(404).json({ error: "User not found" });
 
-        // Prevent double refund
-        if (order.refundStatus === "refunded") {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: "Order already refunded",
-            });
-        }
+        /* CREDIT WALLET */
+        user.creditWallet(
+            order.totalAmount,
+            order._id,
+            `Refund approved for order ${order._id}`
+        );
 
-        // Load or create wallet
-        let wallet = await AdminWallet.findOne().session(session);
-        if (!wallet) {
-            const [created] = await AdminWallet.create(
-                [{ balance: 0, transactions: [] }],
-                { session }
-            );
-            wallet = created;
-        }
+        user.logActivity(
+            "refund_approved",
+            `Refund approved. NPR ${order.totalAmount} credited to wallet.`
+        );
 
-        // Guard: refund once per order
-        if (wallet.hasRefundForOrder(order._id)) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                error: "Wallet refund already exists for this order",
-            });
-        }
+        await user.save();
 
-        // Credit wallet
-        wallet.addTransaction({
-            type: "refund",
-            amount: order.totalAmount,
-            note: `Refund for order ${order._id}`,
-            relatedOrderId: order._id,
-            source: "system",
+        /* SEND EMAIL */
+        const emailContent = refundEmailTemplate(
+            "approved",
+            order._id,
+            order.totalAmount
+        );
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_FROM,
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
         });
 
-        await wallet.save({ session });
-
-        // Update order refund meta
-        order.refundStatus = "refunded";
-        order.refundMethod = "wallet";
-        order.refundAmount = order.totalAmount;
+        /* UPDATE ORDER */
+        order.orderStatus = "refunded";
+        order.refundStatus = "approved";
         order.refundedAt = new Date();
-        order.refundedBy = req.admin._id;
-
-        await order.save({ session });
-
-        await session.commitTransaction();
-        session.endSession();
+        await order.save();
 
         res.json({
             success: true,
-            message: "Store credit refund issued successfully",
+            message: "Refund approved, wallet credited & email sent",
         });
+
     } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
-        console.error("WALLET REFUND ERROR:", err);
-        res.status(500).json({
-            error: "Failed to issue wallet refund",
+        console.error("REFUND APPROVAL ERROR:", err);
+        res.status(500).json({ error: "Refund process failed" });
+    }
+});
+
+/* ========================================
+   REJECT REFUND
+======================================== */
+router.put("/refund/:orderId/reject", adminAuth(), async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        const order = await Order.findById(req.params.orderId);
+        if (!order) return res.status(404).json({ error: "Order not found" });
+
+        order.refundStatus = "rejected";
+        order.refundRejectedReason = reason || "Refund request rejected";
+        order.refundRejectedAt = new Date();
+        await order.save();
+
+        const user = await User.findById(order.user);
+
+        if (user) {
+            user.logActivity(
+                "refund_rejected",
+                `Refund rejected. Reason: ${order.refundRejectedReason}`
+            );
+
+            await user.save();
+
+            /* SEND EMAIL */
+            const emailContent = refundEmailTemplate(
+                "rejected",
+                order._id,
+                0,
+                order.refundRejectedReason
+            );
+
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM,
+                to: user.email,
+                subject: emailContent.subject,
+                html: emailContent.html,
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Refund rejected & email sent",
         });
+
+    } catch (err) {
+        console.error("REFUND REJECTION ERROR:", err);
+        res.status(500).json({ error: "Refund rejection failed" });
+    }
+});
+
+/* ========================================
+   REFUND ANALYTICS
+======================================== */
+router.get("/refund-analytics", adminAuth(), async (req, res) => {
+    try {
+        const totalOrders = await Order.countDocuments();
+        const approvedRefunds = await Order.countDocuments({
+            refundStatus: "approved",
+        });
+        const rejectedRefunds = await Order.countDocuments({
+            refundStatus: "rejected",
+        });
+
+        const refundRate =
+            totalOrders > 0
+                ? ((approvedRefunds / totalOrders) * 100).toFixed(2)
+                : 0;
+
+        const refundAmountAgg = await Order.aggregate([
+            { $match: { refundStatus: "approved" } },
+            { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+        ]);
+
+        res.json({
+            success: true,
+            analytics: {
+                totalOrders,
+                approvedRefunds,
+                rejectedRefunds,
+                refundRate: Number(refundRate),
+                totalRefundAmount: refundAmountAgg[0]?.total || 0,
+            },
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch analytics" });
     }
 });
 

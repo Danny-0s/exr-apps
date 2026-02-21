@@ -14,9 +14,7 @@ export default function Contact() {
         message: "",
     });
 
-    /* ===============================
-       LOAD CONTACT
-    ================================ */
+    /* ================= LOAD CONTACT ================= */
     useEffect(() => {
         const loadContact = async () => {
             try {
@@ -36,17 +34,15 @@ export default function Contact() {
         loadContact();
     }, []);
 
-    /* ===============================
-       FORM HANDLERS
-    ================================ */
-    const handleChange = e => {
-        setForm(prev => ({
+    /* ================= FORM HANDLERS ================= */
+    const handleChange = (e) => {
+        setForm((prev) => ({
             ...prev,
             [e.target.name]: e.target.value,
         }));
     };
 
-    const handleSubmit = async e => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setSending(true);
         setError("");
@@ -70,9 +66,6 @@ export default function Contact() {
         }
     };
 
-    /* ===============================
-       STATES
-    ================================ */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -89,89 +82,88 @@ export default function Contact() {
         );
     }
 
-    /* ===============================
-       RENDER
-    ================================ */
     return (
-        <section className="min-h-screen bg-black text-white exr-section">
-            <div className="exr-container grid grid-cols-1 md:grid-cols-2 gap-16">
+        <section className="bg-black text-white px-6 md:px-20 py-20 md:py-28">
 
-                {/* LEFT */}
-                <div>
-                    <p className="exr-label mb-6">
-                        GET IN TOUCH
-                    </p>
+            <div className="max-w-4xl mx-auto">
 
-                    <h1 className="exr-title mb-8">
-                        {data?.title || "Contact Us"}
-                    </h1>
+                {/* LABEL */}
+                <p className="text-xs tracking-[0.4em] text-zinc-500 uppercase mb-8">
+                    GET IN TOUCH
+                </p>
 
-                    {data?.subtitle && (
-                        <p className="exr-text mb-10">
-                            {data.subtitle}
-                        </p>
+                {/* TITLE */}
+                <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-10">
+                    Talk To The Brand.
+                </h1>
+
+                {/* DESCRIPTION */}
+                <p className="text-zinc-400 text-base md:text-lg leading-relaxed mb-12 max-w-2xl">
+                    {data?.subtitle ||
+                        "For inquiries regarding orders, collaborations, or general questions. We respond within 24 hours."}
+                </p>
+
+                {/* CONTACT LINKS */}
+                <div className="space-y-8 mb-16">
+
+                    {data?.email && (
+                        <a
+                            href={`mailto:${data.email}`}
+                            className="flex items-center gap-6 group"
+                        >
+                            <span className="icon-circle glow">
+                                <FaEnvelope />
+                            </span>
+                            <span className="text-lg text-zinc-300 group-hover:text-white transition">
+                                {data.email}
+                            </span>
+                        </a>
                     )}
 
-                    <div className="space-y-6">
-                        {data?.email && (
-                            <a
-                                href={`mailto:${data.email}`}
-                                className="flex items-center gap-4 group"
-                            >
-                                <span className="icon-circle">
-                                    <FaEnvelope />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
-                                    {data.email}
-                                </span>
-                            </a>
-                        )}
+                    {data?.instagram && (
+                        <a
+                            href={data.instagram}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-6 group"
+                        >
+                            <span className="icon-circle">
+                                <FaInstagram />
+                            </span>
+                            <span className="text-lg text-zinc-300 group-hover:text-white transition">
+                                Instagram
+                            </span>
+                        </a>
+                    )}
 
-                        {data?.instagram && (
-                            <a
-                                href={data.instagram}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-4 group"
-                            >
-                                <span className="icon-circle">
-                                    <FaInstagram />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
-                                    Instagram
-                                </span>
-                            </a>
-                        )}
-
-                        {data?.tiktok && (
-                            <a
-                                href={data.tiktok}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-4 group"
-                            >
-                                <span className="icon-circle">
-                                    <FaTiktok />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
-                                    TikTok
-                                </span>
-                            </a>
-                        )}
-                    </div>
+                    {data?.tiktok && (
+                        <a
+                            href={data.tiktok}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-6 group"
+                        >
+                            <span className="icon-circle">
+                                <FaTiktok />
+                            </span>
+                            <span className="text-lg text-zinc-300 group-hover:text-white transition">
+                                TikTok
+                            </span>
+                        </a>
+                    )}
                 </div>
 
-                {/* RIGHT */}
+                {/* FORM */}
                 <form
                     onSubmit={handleSubmit}
-                    className="exr-card"
+                    className="border border-zinc-800 p-6 md:p-10 space-y-6"
                 >
                     <input
                         name="name"
                         value={form.name}
                         onChange={handleChange}
                         placeholder="Name"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
+                        className="w-full p-4 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
                         required
                     />
 
@@ -181,7 +173,7 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Email"
                         type="email"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
+                        className="w-full p-4 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
                         required
                     />
 
@@ -191,24 +183,25 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Message"
                         rows={5}
-                        className="w-full mb-6 p-3 bg-transparent border border-white/20"
+                        className="w-full p-4 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
                         required
                     />
 
                     <button
                         disabled={sending}
-                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition"
+                        className="w-full border border-white py-4 tracking-[0.3em] text-sm hover:bg-white hover:text-black transition duration-300"
                     >
                         {sending ? "SENDING..." : "SEND"}
                     </button>
                 </form>
+
             </div>
 
             {/* ICON STYLES */}
             <style>{`
                 .icon-circle {
-                    width: 44px;
-                    height: 44px;
+                    width: 56px;
+                    height: 56px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -217,16 +210,20 @@ export default function Contact() {
                     transition: all 0.3s ease;
                 }
 
+                .icon-circle svg {
+                    font-size: 20px;
+                }
+
                 .group:hover .icon-circle {
                     border-color: white;
-                    box-shadow: 0 0 12px rgba(255,255,255,0.4);
                     transform: scale(1.05);
                 }
 
-                .icon-circle svg {
-                    font-size: 18px;
+                .glow {
+                    box-shadow: 0 0 20px rgba(255,255,255,0.3);
                 }
             `}</style>
+
         </section>
     );
 }

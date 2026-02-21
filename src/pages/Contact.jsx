@@ -39,14 +39,14 @@ export default function Contact() {
     /* ===============================
        FORM HANDLERS
     ================================ */
-    const handleChange = e => {
-        setForm(prev => ({
+    const handleChange = (e) => {
+        setForm((prev) => ({
             ...prev,
             [e.target.name]: e.target.value,
         }));
     };
 
-    const handleSubmit = async e => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setSending(true);
         setError("");
@@ -93,27 +93,39 @@ export default function Contact() {
        RENDER
     ================================ */
     return (
-        <section className="min-h-screen bg-black text-white exr-section">
+        <section className="relative bg-black text-white overflow-hidden py-20 md:py-28">
 
-            <div className="exr-container grid grid-cols-2 gap-10 md:gap-20 items-start">
+            <div className="max-w-7xl mx-auto px-6 md:px-20 grid grid-cols-2 gap-12 md:gap-20 items-center">
 
                 {/* LEFT SIDE */}
-                <div className="pr-4">
-                    <p className="exr-label mb-6">
+                <div className="space-y-8">
+
+                    <p className="text-xs tracking-[0.4em] text-zinc-500 uppercase">
                         GET IN TOUCH
                     </p>
 
-                    <h1 className="exr-title mb-8">
-                        {data?.title || "Contact Us"}
+                    <h1 className="uppercase leading-none">
+
+                        <span className="block text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight">
+                            Talk To
+                        </span>
+
+                        <span className="block text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight mt-2">
+                            <span className="text-white/70">The</span>{" "}
+                            <span className="text-red-600 drop-shadow-[0_0_20px_rgba(255,0,0,0.4)]">
+                                Brand.
+                            </span>
+                        </span>
+
                     </h1>
 
                     {data?.subtitle && (
-                        <p className="exr-text mb-10">
+                        <p className="text-sm md:text-base text-zinc-400 leading-relaxed max-w-md">
                             {data.subtitle}
                         </p>
                     )}
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 pt-6">
 
                         {data?.email && (
                             <a
@@ -123,7 +135,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaEnvelope />
                                 </span>
-                                <span className="exr-text opacity-80 group-hover:opacity-100">
+                                <span className="text-zinc-400 group-hover:text-white transition">
                                     {data.email}
                                 </span>
                             </a>
@@ -139,7 +151,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaInstagram />
                                 </span>
-                                <span className="exr-text opacity-80 group-hover:opacity-100">
+                                <span className="text-zinc-400 group-hover:text-white transition">
                                     Instagram
                                 </span>
                             </a>
@@ -155,7 +167,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaTiktok />
                                 </span>
-                                <span className="exr-text opacity-80 group-hover:opacity-100">
+                                <span className="text-zinc-400 group-hover:text-white transition">
                                     TikTok
                                 </span>
                             </a>
@@ -165,46 +177,50 @@ export default function Contact() {
                 </div>
 
                 {/* RIGHT SIDE */}
-                <form
-                    onSubmit={handleSubmit}
-                    className="exr-card p-6 md:p-10"
-                >
-                    <input
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        placeholder="Name"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
-                        required
-                    />
-
-                    <input
-                        name="email"
-                        value={form.email}
-                        onChange={handleChange}
-                        placeholder="Email"
-                        type="email"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
-                        required
-                    />
-
-                    <textarea
-                        name="message"
-                        value={form.message}
-                        onChange={handleChange}
-                        placeholder="Message"
-                        rows={5}
-                        className="w-full mb-6 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
-                        required
-                    />
-
-                    <button
-                        disabled={sending}
-                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition duration-300"
+                <div>
+                    <form
+                        onSubmit={handleSubmit}
+                        className="border border-zinc-800 p-6 md:p-10"
                     >
-                        {sending ? "SENDING..." : "SEND"}
-                    </button>
-                </form>
+
+                        <input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder="Name"
+                            className="w-full mb-4 p-3 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
+                            required
+                        />
+
+                        <input
+                            name="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            placeholder="Email"
+                            type="email"
+                            className="w-full mb-4 p-3 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
+                            required
+                        />
+
+                        <textarea
+                            name="message"
+                            value={form.message}
+                            onChange={handleChange}
+                            placeholder="Message"
+                            rows={5}
+                            className="w-full mb-6 p-3 bg-transparent border border-zinc-700 focus:border-white outline-none transition"
+                            required
+                        />
+
+                        <button
+                            disabled={sending}
+                            className="w-full border border-white py-3 tracking-[0.3em] text-sm hover:bg-white hover:text-black transition duration-300"
+                        >
+                            {sending ? "SENDING..." : "SEND"}
+                        </button>
+
+                    </form>
+                </div>
 
             </div>
 

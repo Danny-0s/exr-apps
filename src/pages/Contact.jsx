@@ -15,16 +15,13 @@ export default function Contact() {
     });
 
     /* ===============================
-       LOAD CONTACT (PRODUCTION SAFE)
+       LOAD CONTACT
     ================================ */
     useEffect(() => {
         const loadContact = async () => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/contact`);
-
-                if (!res.ok) {
-                    throw new Error("Contact not available");
-                }
+                if (!res.ok) throw new Error("Contact not available");
 
                 const json = await res.json();
                 setData(json);
@@ -62,10 +59,7 @@ export default function Contact() {
             });
 
             const json = await res.json();
-
-            if (!res.ok) {
-                throw new Error(json.error || "Failed to send message");
-            }
+            if (!res.ok) throw new Error(json.error || "Failed to send message");
 
             alert("Message sent successfully ✉️");
             setForm({ name: "", email: "", message: "" });
@@ -76,6 +70,9 @@ export default function Contact() {
         }
     };
 
+    /* ===============================
+       STATES
+    ================================ */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -92,27 +89,30 @@ export default function Contact() {
         );
     }
 
+    /* ===============================
+       RENDER
+    ================================ */
     return (
-        <section className="min-h-screen bg-black text-white px-6 md:px-20 py-20 md:py-32">
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-20">
+        <section className="min-h-screen bg-black text-white exr-section">
+            <div className="exr-container grid grid-cols-1 md:grid-cols-2 gap-16">
 
                 {/* LEFT */}
                 <div>
-                    <p className="tracking-widest text-sm opacity-70 mb-6">
+                    <p className="exr-label mb-6">
                         GET IN TOUCH
                     </p>
 
-                    <h1 className="text-4xl md:text-5xl mb-8">
+                    <h1 className="exr-title mb-8">
                         {data?.title || "Contact Us"}
                     </h1>
 
                     {data?.subtitle && (
-                        <p className="opacity-70 mb-10">
+                        <p className="exr-text mb-10">
                             {data.subtitle}
                         </p>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {data?.email && (
                             <a
                                 href={`mailto:${data.email}`}
@@ -121,7 +121,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaEnvelope />
                                 </span>
-                                <span className="opacity-80 group-hover:opacity-100">
+                                <span className="exr-text group-hover:opacity-100">
                                     {data.email}
                                 </span>
                             </a>
@@ -137,7 +137,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaInstagram />
                                 </span>
-                                <span className="opacity-80 group-hover:opacity-100">
+                                <span className="exr-text group-hover:opacity-100">
                                     Instagram
                                 </span>
                             </a>
@@ -153,7 +153,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaTiktok />
                                 </span>
-                                <span className="opacity-80 group-hover:opacity-100">
+                                <span className="exr-text group-hover:opacity-100">
                                     TikTok
                                 </span>
                             </a>
@@ -164,14 +164,14 @@ export default function Contact() {
                 {/* RIGHT */}
                 <form
                     onSubmit={handleSubmit}
-                    className="border border-zinc-800 p-6 md:p-10"
+                    className="exr-card"
                 >
                     <input
                         name="name"
                         value={form.name}
                         onChange={handleChange}
                         placeholder="Name"
-                        className="w-full mb-4 p-3 bg-transparent border"
+                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
                         required
                     />
 
@@ -181,7 +181,7 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Email"
                         type="email"
-                        className="w-full mb-4 p-3 bg-transparent border"
+                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
                         required
                     />
 
@@ -191,18 +191,42 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Message"
                         rows={5}
-                        className="w-full mb-6 p-3 bg-transparent border"
+                        className="w-full mb-6 p-3 bg-transparent border border-white/20"
                         required
                     />
 
                     <button
                         disabled={sending}
-                        className="w-full border py-3 tracking-widest hover:bg-white hover:text-black transition"
+                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition"
                     >
                         {sending ? "SENDING..." : "SEND"}
                     </button>
                 </form>
             </div>
+
+            {/* ICON STYLES */}
+            <style>{`
+                .icon-circle {
+                    width: 44px;
+                    height: 44px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 9999px;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    transition: all 0.3s ease;
+                }
+
+                .group:hover .icon-circle {
+                    border-color: white;
+                    box-shadow: 0 0 12px rgba(255,255,255,0.4);
+                    transform: scale(1.05);
+                }
+
+                .icon-circle svg {
+                    font-size: 18px;
+                }
+            `}</style>
         </section>
     );
 }

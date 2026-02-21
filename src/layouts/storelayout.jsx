@@ -5,16 +5,18 @@ import StoreFooter from "../components/StoreFooter";
 export default function StoreLayout() {
     return (
         <div className="min-h-screen flex flex-col bg-black text-white">
+
             {/* TOP NAVBAR */}
             <Navbar />
 
             {/* PAGE CONTENT */}
-            <div className="flex-1">
+            <main className="flex-1">
                 <Outlet />
-            </div>
+            </main>
 
             {/* FOOTER */}
             <StoreFooter />
+
         </div>
     );
 }

@@ -44,7 +44,6 @@ button {
 /* ==============================
    LUXURY RED UNDERLINE
 ================================ */
-
 .logo-luxury-line {
     height: 2px;
     background: linear-gradient(90deg,
@@ -65,7 +64,6 @@ button {
 /* ==============================
    DROPDOWN ANIMATION (PREMIUM)
 ================================ */
-
 @keyframes dropdownFade {
     0% {
         opacity: 0;
@@ -82,4 +80,56 @@ button {
 
 .animate-dropdown {
     animation: dropdownFade 0.25s ease-out forwards;
+}
+
+/* ===================================
+   EXR GLOBAL DESIGN SYSTEM
+=================================== */
+
+/* Main Container (Used Everywhere) */
+.exr-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+/* Section Spacing */
+.exr-section {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+}
+
+/* Small Upper Label (EST. 2025, POLICY etc) */
+.exr-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+/* Main Title (Responsive Everywhere) */
+.exr-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* Subtitle */
+.exr-subtitle {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    opacity: 0.7;
+}
+
+/* Body Text */
+.exr-text {
+    font-size: 1rem;
+    line-height: 1.7;
+    opacity: 0.75;
+}
+
+/* Card / Content Box */
+.exr-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2rem;
 }

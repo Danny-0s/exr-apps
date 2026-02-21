@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import SectionRenderer from "../components/homepage/SectionRenderer";
 import SplitHero from "../components/SplitHero";
-import API_BASE_URL from "../utils/api";   // ✅ ADD THIS
+import API_BASE_URL from "../utils/api";
 
 export default function Home() {
     const [sections, setSections] = useState([]);
@@ -38,32 +38,39 @@ export default function Home() {
     /* ================= LOADING ================= */
     if (loading) {
         return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center">
-                Loading EXR…
+            <div className="min-h-screen bg-black text-white flex items-center justify-center px-6 text-center">
+                <div className="animate-pulse text-lg md:text-2xl tracking-widest">
+                    Loading EXR…
+                </div>
             </div>
         );
     }
 
     /* ================= MAIN RENDER ================= */
     return (
-        <div className="bg-black text-white">
+        <div className="bg-black text-white w-full overflow-x-hidden">
 
             {/* 🔥 SPLIT HERO — ALWAYS FIRST */}
-            <SplitHero />
+            <div className="w-full">
+                <SplitHero />
+            </div>
 
             {/* 🔥 ADMIN CONTROLLED SECTIONS BELOW */}
-            {sections
-                .filter(
-                    section =>
-                        section.enabled !== false &&
-                        section.type !== "contact"
-                )
-                .map(section => (
-                    <SectionRenderer
-                        key={section._id}
-                        section={section}
-                    />
-                ))}
+            <div className="w-full">
+                {sections
+                    .filter(
+                        section =>
+                            section.enabled !== false &&
+                            section.type !== "contact"
+                    )
+                    .map(section => (
+                        <SectionRenderer
+                            key={section._id}
+                            section={section}
+                        />
+                    ))}
+            </div>
+
         </div>
     );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../utils/api";
+import API_BASE_URL from "../../utils/api";
 
 export default function AdminTeam() {
     const navigate = useNavigate();
@@ -27,6 +27,7 @@ export default function AdminTeam() {
     ];
 
     const currentRole = localStorage.getItem("adminRole");
+    const adminToken = localStorage.getItem("adminToken");
 
     /* =========================================
        LOAD TEAM
@@ -40,8 +41,19 @@ export default function AdminTeam() {
             setLoading(true);
             setError("");
 
-            const data = await api.get("/api/admin/team");
-            setTeam(data.team);
+            const res = await fetch(`${API_BASE_URL}/api/admin/team`, {
+                headers: {
+                    Authorization: `Bearer ${adminToken}`,
+                },
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to load team");
+            }
+
+            setTeam(data.team || []);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -58,7 +70,20 @@ export default function AdminTeam() {
         setSuccess("");
 
         try {
-            await api.post("/api/admin/team", form);
+            const res = await fetch(`${API_BASE_URL}/api/admin/team`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify(form),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to add member");
+            }
 
             setSuccess("Team member added successfully.");
 
@@ -83,7 +108,20 @@ export default function AdminTeam() {
         setSuccess("");
 
         try {
-            await api.put(`/api/admin/team/${id}`, updateData);
+            const res = await fetch(`${API_BASE_URL}/api/admin/team/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify(updateData),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Update failed");
+            }
 
             setSuccess("Updated successfully.");
             fetchTeam();
@@ -102,7 +140,18 @@ export default function AdminTeam() {
         setSuccess("");
 
         try {
-            await api.delete(`/api/admin/team/${id}`);
+            const res = await fetch(`${API_BASE_URL}/api/admin/team/${id}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${adminToken}`,
+                },
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Delete failed");
+            }
 
             setSuccess("Admin removed successfully.");
             fetchTeam();

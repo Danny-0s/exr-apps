@@ -94,10 +94,11 @@ export default function Contact() {
     ================================ */
     return (
         <section className="min-h-screen bg-black text-white exr-section">
-            <div className="exr-container grid grid-cols-1 md:grid-cols-2 gap-16">
 
-                {/* LEFT */}
-                <div>
+            <div className="exr-container grid grid-cols-2 gap-10 md:gap-20 items-start">
+
+                {/* LEFT SIDE */}
+                <div className="pr-4">
                     <p className="exr-label mb-6">
                         GET IN TOUCH
                     </p>
@@ -113,6 +114,7 @@ export default function Contact() {
                     )}
 
                     <div className="space-y-6">
+
                         {data?.email && (
                             <a
                                 href={`mailto:${data.email}`}
@@ -121,7 +123,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaEnvelope />
                                 </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <span className="exr-text opacity-80 group-hover:opacity-100">
                                     {data.email}
                                 </span>
                             </a>
@@ -137,7 +139,7 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaInstagram />
                                 </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <span className="exr-text opacity-80 group-hover:opacity-100">
                                     Instagram
                                 </span>
                             </a>
@@ -153,25 +155,26 @@ export default function Contact() {
                                 <span className="icon-circle">
                                     <FaTiktok />
                                 </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <span className="exr-text opacity-80 group-hover:opacity-100">
                                     TikTok
                                 </span>
                             </a>
                         )}
+
                     </div>
                 </div>
 
-                {/* RIGHT */}
+                {/* RIGHT SIDE */}
                 <form
                     onSubmit={handleSubmit}
-                    className="exr-card"
+                    className="exr-card p-6 md:p-10"
                 >
                     <input
                         name="name"
                         value={form.name}
                         onChange={handleChange}
                         placeholder="Name"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
+                        className="w-full mb-4 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
                         required
                     />
 
@@ -181,7 +184,7 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Email"
                         type="email"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
+                        className="w-full mb-4 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
                         required
                     />
 
@@ -191,17 +194,18 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="Message"
                         rows={5}
-                        className="w-full mb-6 p-3 bg-transparent border border-white/20"
+                        className="w-full mb-6 p-3 bg-transparent border border-white/20 focus:border-white outline-none transition"
                         required
                     />
 
                     <button
                         disabled={sending}
-                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition"
+                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition duration-300"
                     >
                         {sending ? "SENDING..." : "SEND"}
                     </button>
                 </form>
+
             </div>
 
             {/* ICON STYLES */}
@@ -227,6 +231,7 @@ export default function Contact() {
                     font-size: 18px;
                 }
             `}</style>
+
         </section>
     );
 }

@@ -3,7 +3,6 @@ import PolicyNavigation from "../components/policy/PolicyNavigation";
 
 /* ===============================
    POLICY CONTENT (TEMP / SAFE)
-   (Can be CMS-driven later)
 ================================ */
 const POLICY_CONTENT = {
     shipping: {
@@ -55,17 +54,20 @@ export default function PolicyPage() {
     }
 
     return (
-        <section className="min-h-screen bg-black text-white px-6 md:px-20 py-32">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl tracking-widest mb-10">
+        <section className="min-h-screen bg-black text-white exr-section">
+            <div className="exr-container max-w-3xl">
+
+                {/* TITLE */}
+                <h1 className="exr-title mb-10">
                     {policy.title}
                 </h1>
 
-                <div className="opacity-80 leading-8 whitespace-pre-line">
+                {/* BODY */}
+                <div className="exr-text whitespace-pre-line mb-16">
                     {policy.body}
                 </div>
 
-                {/* PREV / NEXT */}
+                {/* PREV / NEXT NAVIGATION */}
                 <PolicyNavigation currentKey={policyKey} />
             </div>
         </section>

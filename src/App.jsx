@@ -14,8 +14,6 @@ import Checkout from "./pages/checkout";
 import Success from "./pages/success";
 import Contact from "./pages/Contact";
 import Profiles from "./pages/profiles";
-
-/* SHOP */
 import Shop from "./pages/Shop";
 
 /* ===== USER ACCOUNT PAGES ===== */
@@ -62,22 +60,23 @@ export default function App() {
     <Routes>
 
       {/* ================= STORE ================= */}
-      <Route element={<StoreLayout />}>
+      <Route path="/" element={<StoreLayout />}>
 
-        <Route path="/" element={<Home />} />
+        {/* Home */}
+        <Route index element={<Home />} />
 
         {/* Shop */}
-        <Route path="/shop" element={<Shop />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/products/:id" element={<ProductDetails />} />
+        <Route path="shop" element={<Shop />} />
+        <Route path="products" element={<Products />} />
+        <Route path="products/:id" element={<ProductDetails />} />
 
-        {/* AUTH */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        {/* Auth */}
+        <Route path="login" element={<Login />} />
+        <Route path="register" element={<Register />} />
 
-        {/* ================= PROTECTED USER ROUTES ================= */}
+        {/* Protected User Routes */}
         <Route
-          path="/orders"
+          path="orders"
           element={
             <PrivateRoute>
               <Orders />
@@ -86,7 +85,7 @@ export default function App() {
         />
 
         <Route
-          path="/wishlist"
+          path="wishlist"
           element={
             <PrivateRoute>
               <MyWaitlist />
@@ -95,7 +94,7 @@ export default function App() {
         />
 
         <Route
-          path="/coupons"
+          path="coupons"
           element={
             <PrivateRoute>
               <Coupons />
@@ -104,7 +103,7 @@ export default function App() {
         />
 
         <Route
-          path="/wallet"
+          path="wallet"
           element={
             <PrivateRoute>
               <Wallet />
@@ -113,18 +112,20 @@ export default function App() {
         />
 
         {/* Checkout */}
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/success" element={<Success />} />
+        <Route path="cart" element={<Cart />} />
+        <Route path="checkout" element={<Checkout />} />
+        <Route path="success" element={<Success />} />
 
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/profiles" element={<Profiles />} />
+        {/* Other Pages */}
+        <Route path="contact" element={<Contact />} />
+        <Route path="profiles" element={<Profiles />} />
 
         {/* Policies */}
-        <Route path="/shipping-policy" element={<ShippingPolicy />} />
-        <Route path="/refund-policy" element={<ReturnRefundPolicy />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-and-conditions" element={<TermsPolicy />} />
+        <Route path="shipping-policy" element={<ShippingPolicy />} />
+        <Route path="refund-policy" element={<ReturnRefundPolicy />} />
+        <Route path="privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="terms-and-conditions" element={<TermsPolicy />} />
+
       </Route>
 
       {/* ================= ADMIN LOGIN ================= */}

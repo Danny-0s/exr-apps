@@ -18,19 +18,30 @@ export default function AdminRoute({ children }) {
             }
 
             try {
-                const res = await fetch(`${API_BASE_URL}/api/admin/verify`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const res = await fetch(
+                    `${API_BASE_URL}/api/admin/verify`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
 
                 if (!res.ok) {
                     throw new Error("Invalid token");
                 }
 
+                const data = await res.json();
+
+                // ✅ Save role safely
+                if (data.role) {
+                    localStorage.setItem("adminRole", data.role);
+                }
+
                 setAuthorized(true);
+
             } catch (err) {
-                // ❌ Token invalid or expired → clear everything
+                // ❌ Token invalid or expired
                 localStorage.removeItem("adminToken");
                 localStorage.removeItem("adminRefreshToken");
                 localStorage.removeItem("adminRole");
@@ -44,7 +55,7 @@ export default function AdminRoute({ children }) {
         verifyToken();
     }, [token]);
 
-    // ⏳ While checking token
+    // ⏳ While checking
     if (checking) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -53,7 +64,7 @@ export default function AdminRoute({ children }) {
         );
     }
 
-    // 🔒 Not authorized → redirect to login
+    // 🔒 Not authorized
     if (!authorized) {
         return (
             <Navigate

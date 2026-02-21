@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FaEnvelope, FaInstagram, FaTiktok } from "react-icons/fa";
+import API_BASE_URL from "../utils/api";
 
 export default function Contact() {
     const [data, setData] = useState(null);
@@ -14,12 +15,12 @@ export default function Contact() {
     });
 
     /* ===============================
-       LOAD CONTACT (PUBLISHED)
+       LOAD CONTACT (PRODUCTION SAFE)
     ================================ */
     useEffect(() => {
         const loadContact = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/contact");
+                const res = await fetch(`${API_BASE_URL}/api/contact`);
 
                 if (!res.ok) {
                     throw new Error("Contact not available");
@@ -54,7 +55,7 @@ export default function Contact() {
         setError("");
 
         try {
-            const res = await fetch("http://localhost:4242/api/contact", {
+            const res = await fetch(`${API_BASE_URL}/api/contact`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -75,9 +76,6 @@ export default function Contact() {
         }
     };
 
-    /* ===============================
-       STATES
-    ================================ */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -94,19 +92,17 @@ export default function Contact() {
         );
     }
 
-    /* ===============================
-       RENDER
-    ================================ */
     return (
-        <section className="min-h-screen bg-black text-white px-6 md:px-20 py-32">
-            <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-20">
+        <section className="min-h-screen bg-black text-white px-6 md:px-20 py-20 md:py-32">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-20">
+
                 {/* LEFT */}
                 <div>
                     <p className="tracking-widest text-sm opacity-70 mb-6">
                         GET IN TOUCH
                     </p>
 
-                    <h1 className="text-5xl mb-8">
+                    <h1 className="text-4xl md:text-5xl mb-8">
                         {data?.title || "Contact Us"}
                     </h1>
 
@@ -116,15 +112,10 @@ export default function Contact() {
                         </p>
                     )}
 
-                    {/* ICON LINKS */}
                     <div className="space-y-4">
                         {data?.email && (
                             <a
-                                href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-                                    data.email
-                                )}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href={`mailto:${data.email}`}
                                 className="flex items-center gap-4 group"
                             >
                                 <span className="icon-circle">
@@ -173,7 +164,7 @@ export default function Contact() {
                 {/* RIGHT */}
                 <form
                     onSubmit={handleSubmit}
-                    className="border border-zinc-800 p-10"
+                    className="border border-zinc-800 p-6 md:p-10"
                 >
                     <input
                         name="name"
@@ -212,30 +203,6 @@ export default function Contact() {
                     </button>
                 </form>
             </div>
-
-            {/* ICON STYLES */}
-            <style>{`
-                .icon-circle {
-                    width: 44px;
-                    height: 44px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 9999px;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    transition: all 0.3s ease;
-                }
-
-                .group:hover .icon-circle {
-                    border-color: white;
-                    box-shadow: 0 0 12px rgba(255,255,255,0.4);
-                    transform: scale(1.05);
-                }
-
-                .icon-circle svg {
-                    font-size: 18px;
-                }
-            `}</style>
         </section>
     );
 }

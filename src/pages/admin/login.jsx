@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import API_BASE_URL from "../../utils/api";
 
 export default function AdminLogin() {
     const [email, setEmail] = useState("");
@@ -16,7 +17,7 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            const res = await fetch("http://localhost:4242/api/admin/login", {
+            const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -28,16 +29,21 @@ export default function AdminLogin() {
 
             if (!res.ok) {
                 alert(data.error || "Login failed");
-                setLoading(false);
                 return;
             }
 
-            // ✅ SAVE TOKENS (VERY IMPORTANT)
+            // ✅ SAVE TOKENS (unchanged)
             localStorage.setItem("adminToken", data.accessToken);
             localStorage.setItem("adminRefreshToken", data.refreshToken);
 
+            // ✅ SAVE ROLE (SAFE + CORRECT)
+            if (data.admin && data.admin.role) {
+                localStorage.setItem("adminRole", data.admin.role);
+            }
+
             // ✅ GO TO ADMIN
             navigate("/admin");
+
         } catch (err) {
             alert("Server error");
         } finally {

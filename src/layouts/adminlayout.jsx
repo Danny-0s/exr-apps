@@ -1,8 +1,22 @@
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 export default function AdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
+    const [adminRole, setAdminRole] = useState(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem("adminToken");
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split(".")[1]));
+                setAdminRole(payload.role);
+            } catch (err) {
+                console.error("Invalid token");
+            }
+        }
+    }, []);
 
     const logout = () => {
         localStorage.removeItem("adminToken");
@@ -24,45 +38,40 @@ export default function AdminLayout() {
                 </h2>
 
                 <nav className="flex flex-col gap-4 text-sm">
+
                     <Link to="/admin" className={isActive("/admin")}>
                         Dashboard
                     </Link>
 
-                    <Link
-                        to="/admin/products"
-                        className={isActive("/admin/products")}
-                    >
+                    <Link to="/admin/products" className={isActive("/admin/products")}>
                         Products
                     </Link>
 
-                    <Link
-                        to="/admin/orders"
-                        className={isActive("/admin/orders")}
-                    >
+                    <Link to="/admin/orders" className={isActive("/admin/orders")}>
                         Orders
                     </Link>
 
-                    {/* ✅ ADDED — COUPONS */}
-                    <Link
-                        to="/admin/coupons"
-                        className={isActive("/admin/coupons")}
-                    >
+                    <Link to="/admin/coupons" className={isActive("/admin/coupons")}>
                         Coupons
                     </Link>
 
-                    <Link
-                        to="/admin/wallet"
-                        className={isActive("/admin/wallet")}
-                    >
+                    <Link to="/admin/wallet" className={isActive("/admin/wallet")}>
                         Wallet
                     </Link>
 
-                    <Link
-                        to="/admin/settings"
-                        className={isActive("/admin/settings")}
-                    >
+                    <Link to="/admin/settings" className={isActive("/admin/settings")}>
                         Settings
                     </Link>
+
+                    {/* 🔥 SUPER ADMIN ONLY */}
+                    {adminRole === "super_admin" && (
+                        <Link
+                            to="/admin/team"
+                            className={isActive("/admin/team")}
+                        >
+                            Team Management
+                        </Link>
+                    )}
 
                     <Link to="/" className="text-white/60 hover:text-white">
                         View Store

@@ -6,9 +6,6 @@ import {
     User,
     Search,
     ChevronDown,
-    Heart,
-    Ticket,
-    Wallet
 } from "lucide-react";
 
 export default function Navbar() {
@@ -16,7 +13,6 @@ export default function Navbar() {
     const navigate = useNavigate();
 
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [wishlistCount, setWishlistCount] = useState(0);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     const dropdownRef = useRef(null);
@@ -51,30 +47,11 @@ export default function Navbar() {
         };
     }, []);
 
-    /* ================= WISHLIST ================= */
-    useEffect(() => {
-        const updateWishlist = () => {
-            const stored = JSON.parse(
-                localStorage.getItem("waitlistedProducts") || "[]"
-            );
-            setWishlistCount(stored.length);
-        };
-
-        updateWishlist();
-        window.addEventListener("storage", updateWishlist);
-        window.addEventListener("waitlist-updated", updateWishlist);
-
-        return () => {
-            window.removeEventListener("storage", updateWishlist);
-            window.removeEventListener("waitlist-updated", updateWishlist);
-        };
-    }, []);
-
     return (
-        <div className="w-full bg-black text-white border-b border-zinc-800 relative z-50">
+        <header className="w-full bg-black text-white border-b border-zinc-800 relative z-50">
 
             {/* TOP BAR */}
-            <div className="w-full text-center text-sm py-2 border-b border-zinc-800 tracking-wide">
+            <div className="text-center text-xs sm:text-sm py-2 border-b border-zinc-800 tracking-wide px-4">
                 Sign up and get 20% off your first order.{" "}
                 <Link
                     to="/register"
@@ -84,15 +61,15 @@ export default function Navbar() {
                 </Link>
             </div>
 
-            <nav className="flex items-center justify-between px-10 py-6">
+            <nav className="exr-container flex items-center justify-between py-4">
 
                 {/* LOGO */}
                 <Link to="/" className="relative group inline-block">
                     <div className="flex items-end">
-                        <span className="text-4xl font-black tracking-tight">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
                             EXR
                         </span>
-                        <span className="text-base font-black ml-1 lowercase text-red-500">
+                        <span className="text-xs sm:text-sm ml-1 lowercase text-red-500 font-black">
                             .np
                         </span>
                     </div>
@@ -113,8 +90,8 @@ export default function Navbar() {
                     ></span>
                 </Link>
 
-                {/* SEARCH */}
-                <div className="hidden md:flex items-center bg-zinc-900/80 backdrop-blur-md px-6 py-3 rounded-full w-[520px] border border-zinc-800 focus-within:border-red-500 transition-all duration-300">
+                {/* SEARCH (Hidden on small) */}
+                <div className="hidden md:flex items-center bg-zinc-900/80 backdrop-blur-md px-6 py-3 rounded-full w-[420px] border border-zinc-800 focus-within:border-red-500 transition-all duration-300">
                     <Search size={18} className="text-white/40 mr-3" />
                     <input
                         type="text"
@@ -124,12 +101,12 @@ export default function Navbar() {
                 </div>
 
                 {/* RIGHT SIDE */}
-                <div className="flex items-center gap-8 relative">
+                <div className="flex items-center gap-6 sm:gap-8 relative">
 
                     {/* CART */}
                     <Link to="/cart" className="relative group">
                         <ShoppingCart
-                            size={22}
+                            size={20}
                             className="transition group-hover:text-red-500"
                         />
                         {cartCount > 0 && (
@@ -145,16 +122,17 @@ export default function Navbar() {
                             onClick={() => setDropdownOpen(!dropdownOpen)}
                             className="flex items-center gap-1 transition hover:text-red-500"
                         >
-                            <User size={22} />
+                            <User size={20} />
                             <ChevronDown
-                                size={16}
-                                className={`transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""}`}
+                                size={14}
+                                className={`transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""
+                                    }`}
                             />
                         </button>
 
                         <div
                             className={`
-                            absolute right-0 mt-4 w-72
+                            absolute right-0 mt-4 w-64
                             bg-zinc-900/95 backdrop-blur-xl
                             border border-zinc-800
                             rounded-2xl shadow-2xl
@@ -212,7 +190,8 @@ export default function Navbar() {
                         </div>
                     </div>
                 </div>
+
             </nav>
-        </div>
+        </header>
     );
 }

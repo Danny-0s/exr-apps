@@ -41,6 +41,7 @@ import AdminOrders from "./pages/admin/adminorders";
 import AdminWallet from "./pages/admin/AdminWallet";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminCoupons from "./pages/admin/AdminCoupons";
+import AdminTeam from "./pages/admin/AdminTeam"; // ✅ ADDED
 
 /* ===============================
    USER ROUTE PROTECTION
@@ -62,19 +63,15 @@ export default function App() {
       {/* ================= STORE ================= */}
       <Route path="/" element={<StoreLayout />}>
 
-        {/* Home */}
         <Route index element={<Home />} />
 
-        {/* Shop */}
         <Route path="shop" element={<Shop />} />
         <Route path="products" element={<Products />} />
         <Route path="products/:id" element={<ProductDetails />} />
 
-        {/* Auth */}
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
 
-        {/* Protected User Routes */}
         <Route
           path="orders"
           element={
@@ -111,16 +108,13 @@ export default function App() {
           }
         />
 
-        {/* Checkout */}
         <Route path="cart" element={<Cart />} />
         <Route path="checkout" element={<Checkout />} />
         <Route path="success" element={<Success />} />
 
-        {/* Other Pages */}
         <Route path="contact" element={<Contact />} />
         <Route path="profiles" element={<Profiles />} />
 
-        {/* Policies */}
         <Route path="shipping-policy" element={<ShippingPolicy />} />
         <Route path="refund-policy" element={<ReturnRefundPolicy />} />
         <Route path="privacy-policy" element={<PrivacyPolicy />} />
@@ -147,6 +141,7 @@ export default function App() {
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="wallet" element={<AdminWallet />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="team" element={<AdminTeam />} /> {/* ✅ FIXED */}
       </Route>
 
     </Routes>

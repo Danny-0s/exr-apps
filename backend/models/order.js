@@ -1,14 +1,19 @@
 import mongoose from "mongoose";
 
+/* =====================================================
+   REFUND TIMELINE SUBSCHEMA
+===================================================== */
 const refundTimelineSchema = new mongoose.Schema(
     {
         status: {
             type: String,
             required: true,
+            trim: true,
         },
         note: {
             type: String,
             default: "",
+            trim: true,
         },
         createdAt: {
             type: Date,
@@ -18,6 +23,56 @@ const refundTimelineSchema = new mongoose.Schema(
     { _id: false }
 );
 
+/* =====================================================
+   ORDER ITEM SUBSCHEMA
+===================================================== */
+const orderItemSchema = new mongoose.Schema(
+    {
+        _id: {
+            type: String, // Product ID snapshot
+            required: true,
+        },
+        title: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        price: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        quantity: {
+            type: Number,
+            required: true,
+            min: 1,
+        },
+        image: {
+            type: String,
+            default: "",
+        },
+    },
+    { _id: false }
+);
+
+/* =====================================================
+   SHIPPING SUBSCHEMA
+===================================================== */
+const shippingSchema = new mongoose.Schema(
+    {
+        fullName: { type: String, required: true, trim: true },
+        phone: { type: String, required: true, trim: true },
+        address: { type: String, required: true, trim: true },
+        city: { type: String, required: true, trim: true },
+        province: { type: String, required: true, trim: true },
+        notes: { type: String, default: "", trim: true },
+    },
+    { _id: false }
+);
+
+/* =====================================================
+   MAIN ORDER SCHEMA
+===================================================== */
 const orderSchema = new mongoose.Schema(
     {
         /* ===============================
@@ -26,52 +81,34 @@ const orderSchema = new mongoose.Schema(
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            default: null,
+            required: true,
+            index: true,
         },
 
         /* ===============================
            ORDER ITEMS
         ================================ */
-        items: [
-            {
-                _id: {
-                    type: String,
-                    required: true,
-                },
-                title: {
-                    type: String,
-                    required: true,
-                },
-                price: {
-                    type: Number,
-                    required: true,
-                },
-                quantity: {
-                    type: Number,
-                    required: true,
-                },
-                image: String,
-            },
-        ],
+        items: {
+            type: [orderItemSchema],
+            validate: v => v.length > 0,
+            required: true,
+        },
 
         /* ===============================
            SHIPPING INFO
         ================================ */
         shipping: {
-            fullName: String,
-            phone: String,
-            address: String,
-            city: String,
-            province: String,
-            notes: String,
+            type: shippingSchema,
+            required: true,
         },
 
         /* ===============================
-           TOTAL
+           TOTAL AMOUNT
         ================================ */
         totalAmount: {
             type: Number,
             required: true,
+            min: 0,
         },
 
         /* ===============================
@@ -81,6 +118,7 @@ const orderSchema = new mongoose.Schema(
             type: String,
             enum: ["stripe", "cod", "esewa", "khalti", "wallet"],
             required: true,
+            index: true,
         },
 
         /* ===============================
@@ -88,8 +126,9 @@ const orderSchema = new mongoose.Schema(
         ================================ */
         paymentStatus: {
             type: String,
-            enum: ["pending", "paid", "failed"],
+            enum: ["pending", "paid", "failed", "refunded"],
             default: "pending",
+            index: true,
         },
 
         /* ===============================
@@ -100,12 +139,14 @@ const orderSchema = new mongoose.Schema(
             enum: [
                 "pending",
                 "paid",
+                "processing",
                 "shipped",
                 "delivered",
                 "cancelled",
-                "refunded", // 🔥 added
+                "refunded",
             ],
             default: "pending",
+            index: true,
         },
 
         /* ===============================
@@ -114,21 +155,23 @@ const orderSchema = new mongoose.Schema(
         stripeSessionId: {
             type: String,
             default: null,
+            index: true,
         },
 
         stripePaymentIntentId: {
             type: String,
             default: null,
+            index: true,
         },
 
         /* ===============================
-           COUPON META
+           COUPON SNAPSHOT
         ================================ */
         coupon: {
-            code: String,
-            type: String,
-            value: Number,
-            discount: Number,
+            code: { type: String, trim: true },
+            type: { type: String, trim: true },
+            value: { type: Number, min: 0 },
+            discount: { type: Number, min: 0 },
         },
 
         /* ===============================
@@ -151,6 +194,7 @@ const orderSchema = new mongoose.Schema(
                 "size_issue",
                 "damaged_item",
                 "wrong_item",
+                null,
             ],
             default: null,
         },
@@ -159,11 +203,13 @@ const orderSchema = new mongoose.Schema(
             type: String,
             enum: ["none", "requested", "approved", "rejected", "refunded"],
             default: "none",
+            index: true,
         },
 
         refundRejectReason: {
             type: String,
             default: null,
+            trim: true,
         },
 
         refundMethod: {
@@ -174,6 +220,7 @@ const orderSchema = new mongoose.Schema(
 
         refundAmount: {
             type: Number,
+            min: 0,
             default: 0,
         },
 
@@ -191,7 +238,10 @@ const orderSchema = new mongoose.Schema(
         /* ===============================
            REFUND TIMELINE
         ================================ */
-        refundTimeline: [refundTimelineSchema],
+        refundTimeline: {
+            type: [refundTimelineSchema],
+            default: [],
+        },
 
         /* ===============================
            ANALYTICS FLAGS
@@ -208,14 +258,46 @@ const orderSchema = new mongoose.Schema(
     }
 );
 
-/* =========================================
-   HELPER: ADD REFUND TIMELINE ENTRY
-========================================= */
+/* =====================================================
+   INDEXES (PRODUCTION PERFORMANCE)
+===================================================== */
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ user: 1, createdAt: -1 });
+
+/* =====================================================
+   HELPER METHODS
+===================================================== */
 orderSchema.methods.addRefundTimeline = function (status, note = "") {
     this.refundTimeline.push({
         status,
         note,
+        createdAt: new Date(),
     });
 };
+
+orderSchema.methods.markAsRefunded = function (adminId, amount, method) {
+    this.refundStatus = "refunded";
+    this.orderStatus = "refunded";
+    this.paymentStatus = "refunded";
+    this.refundAmount = amount;
+    this.refundMethod = method;
+    this.refundedAt = new Date();
+    this.refundedBy = adminId;
+    this.analytics.refundProcessed = true;
+
+    this.addRefundTimeline("refunded", "Refund completed");
+};
+
+/* =====================================================
+   PRE-SAVE VALIDATION
+===================================================== */
+orderSchema.pre("save", function (next) {
+    // Prevent refund amount greater than total
+    if (this.refundAmount > this.totalAmount) {
+        return next(new Error("Refund amount cannot exceed total amount"));
+    }
+
+    next();
+});
 
 export default mongoose.model("Order", orderSchema);

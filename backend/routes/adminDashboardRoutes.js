@@ -1,5 +1,5 @@
 import express from "express";
-import Order from "../models/order.js";
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
 import adminAuth from "../middleware/adminAuth.js";
@@ -7,7 +7,7 @@ import adminAuth from "../middleware/adminAuth.js";
 const router = express.Router();
 
 /* ======================================================
-   ADMIN DASHBOARD STATS
+   ADMIN DASHBOARD STATS (PRODUCTION SAFE)
 ====================================================== */
 router.get("/stats", adminAuth("owner"), async (_req, res) => {
     try {
@@ -19,7 +19,7 @@ router.get("/stats", adminAuth("owner"), async (_req, res) => {
             orderStatus: "pending",
         });
 
-        /* ================= TOTAL REVENUE (PAID ONLY) ================= */
+        /* ================= GROSS REVENUE (PAID ONLY) ================= */
         const revenueAgg = await Order.aggregate([
             { $match: { paymentStatus: "paid" } },
             {
@@ -30,26 +30,40 @@ router.get("/stats", adminAuth("owner"), async (_req, res) => {
             },
         ]);
 
-        const totalRevenue = revenueAgg[0]?.total || 0;
+        const grossRevenue = revenueAgg[0]?.total || 0;
+
+        /* ================= TOTAL REFUNDED ================= */
+        const refundAgg = await Order.aggregate([
+            { $match: { refundStatus: "approved" } },
+            {
+                $group: {
+                    _id: null,
+                    totalRefunded: { $sum: "$refundAmount" },
+                },
+            },
+        ]);
+
+        const totalRefundedAmount = refundAgg[0]?.totalRefunded || 0;
+
+        /* ================= NET REVENUE ================= */
+        const netRevenue = grossRevenue - totalRefundedAmount;
 
         /* ================= LOW STOCK ================= */
         const lowStockProducts = await Product.find({
             stock: { $lte: 5 },
+            isActive: true,
         })
-            .select("name stock")
+            .select("title stock")
             .limit(5);
 
         const lowStockCount = lowStockProducts.length;
 
-        /* ================= REGISTERED USERS ================= */
+        /* ================= USERS ================= */
         const totalUsers = await User.countDocuments();
 
-        /* =====================================================
-           🔥 REFUND ANALYTICS
-        ====================================================== */
-
+        /* ================= REFUND METRICS ================= */
         const totalRefundRequests = await Order.countDocuments({
-            refundRequested: true,
+            refundStatus: "requested",
         });
 
         const approvedRefunds = await Order.countDocuments({
@@ -60,33 +74,19 @@ router.get("/stats", adminAuth("owner"), async (_req, res) => {
             refundStatus: "rejected",
         });
 
-        const refundedAgg = await Order.aggregate([
-            { $match: { refundStatus: "approved" } },
-            {
-                $group: {
-                    _id: null,
-                    totalRefunded: { $sum: "$totalAmount" },
-                },
-            },
-        ]);
-
-        const totalRefundedAmount = refundedAgg[0]?.totalRefunded || 0;
-
-        /* Refund percentage */
         const refundRate =
             totalOrders > 0
-                ? ((approvedRefunds / totalOrders) * 100).toFixed(2)
+                ? Number(
+                    ((approvedRefunds / totalOrders) * 100).toFixed(2)
+                )
                 : 0;
-
-        /* Revenue after refunds */
-        const netRevenue = totalRevenue - totalRefundedAmount;
 
         res.json({
             success: true,
             stats: {
                 totalOrders,
                 pendingOrders,
-                totalRevenue,
+                grossRevenue,
                 netRevenue,
                 totalRefundedAmount,
                 refundRate,
@@ -100,7 +100,7 @@ router.get("/stats", adminAuth("owner"), async (_req, res) => {
         });
 
     } catch (err) {
-        console.error("DASHBOARD STATS ERROR:", err);
+        console.error("DASHBOARD ERROR:", err);
         res.status(500).json({
             error: "Failed to load dashboard stats",
         });
@@ -117,7 +117,8 @@ router.get("/recent", adminAuth("owner"), async (_req, res) => {
             .limit(5)
             .select(
                 "_id totalAmount paymentMethod orderStatus paymentStatus createdAt refundStatus"
-            );
+            )
+            .populate("user", "email");
 
         res.json({
             success: true,
@@ -133,8 +134,7 @@ router.get("/recent", adminAuth("owner"), async (_req, res) => {
 });
 
 /* ======================================================
-   🔥 DETAILED REFUND ANALYTICS ENDPOINT
-   GET /api/admin/dashboard/refund-analytics
+   DETAILED REFUND ANALYTICS
 ====================================================== */
 router.get(
     "/refund-analytics",
@@ -143,24 +143,24 @@ router.get(
         try {
             const totalOrders = await Order.countDocuments();
 
-            const refundData = await Order.aggregate([
+            const refundBreakdown = await Order.aggregate([
                 {
                     $group: {
                         _id: "$refundStatus",
                         count: { $sum: 1 },
-                        amount: { $sum: "$totalAmount" },
+                        amount: { $sum: "$refundAmount" },
                     },
                 },
             ]);
 
             const formatted = {
+                none: 0,
                 requested: 0,
                 approved: 0,
                 rejected: 0,
-                refunded: 0,
             };
 
-            refundData.forEach(item => {
+            refundBreakdown.forEach((item) => {
                 if (formatted[item._id] !== undefined) {
                     formatted[item._id] = item.count;
                 }
@@ -168,12 +168,12 @@ router.get(
 
             const refundRate =
                 totalOrders > 0
-                    ? (
-                        ((formatted.approved +
-                            formatted.refunded) /
-                            totalOrders) *
-                        100
-                    ).toFixed(2)
+                    ? Number(
+                        (
+                            (formatted.approved / totalOrders) *
+                            100
+                        ).toFixed(2)
+                    )
                     : 0;
 
             res.json({

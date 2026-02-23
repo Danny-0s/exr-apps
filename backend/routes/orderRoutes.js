@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import Order from "../models/order.js";
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
@@ -11,59 +11,66 @@ const router = express.Router();
 
 /* ===================================================
    CREATE ORDER
-   ✅ WALLET SUPPORTED
-   ✅ SAFE STOCK
-   ✅ SAFE COUPON
-   ✅ TRANSACTION SAFE
 =================================================== */
 router.post("/", userAuth, async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const {
-            items,
-            shipping,
-            paymentMethod = "cod",
-            coupon = null,
-        } = req.body;
+        const { items, shipping, paymentMethod = "cod", coupon = null } =
+            req.body;
 
-        const settings = await Settings.getSingleton();
-
-        if (settings.maintenanceMode) {
-            throw new Error("Store is under maintenance");
+        if (!Array.isArray(items) || items.length === 0) {
+            throw new Error("Invalid items");
         }
 
-        if (!Array.isArray(items) || items.length === 0 || !shipping) {
-            throw new Error("Invalid order data");
+        if (!shipping?.fullName || !shipping?.address) {
+            throw new Error("Invalid shipping information");
+        }
+
+        const settings = await Settings.getSingleton();
+        if (settings.maintenanceMode) {
+            throw new Error("Store under maintenance");
         }
 
         /* ===============================
-           STOCK CHECK + SUBTOTAL
+           STOCK + PRICE SNAPSHOT
         ================================ */
         let subtotal = 0;
+        const orderItems = [];
 
         for (const item of items) {
+            if (!mongoose.Types.ObjectId.isValid(item._id)) {
+                throw new Error("Invalid product ID");
+            }
+
             const product = await Product.findOneAndUpdate(
                 {
                     _id: item._id,
                     stock: { $gte: item.quantity },
+                    isActive: true,
                 },
                 { $inc: { stock: -item.quantity } },
                 { new: true, session }
             );
 
             if (!product) {
-                throw new Error(
-                    `Insufficient stock for ${item.title}`
-                );
+                throw new Error(`Insufficient stock for ${item.title}`);
             }
 
             subtotal += product.price * item.quantity;
+
+            orderItems.push({
+                _id: product._id.toString(),
+                title: product.title,
+                price: product.price,
+                quantity: item.quantity,
+                image: product.images?.[0] || "",
+            });
         }
 
         /* ===============================
-           COUPON VALIDATION
+           COUPON
         ================================ */
         let appliedCoupon = null;
         let discountAmount = 0;
@@ -87,22 +94,15 @@ router.post("/", userAuth, async (req, res) => {
                 couponDoc.maxUses !== null &&
                 couponDoc.usedCount >= couponDoc.maxUses
             ) {
-                throw new Error("Coupon usage limit reached");
+                throw new Error("Coupon limit reached");
             }
 
-            if (couponDoc.type === "fixed") {
-                discountAmount = couponDoc.value;
-            }
+            discountAmount =
+                couponDoc.type === "percent"
+                    ? Math.round((subtotal * couponDoc.value) / 100)
+                    : couponDoc.value;
 
-            if (couponDoc.type === "percent") {
-                discountAmount = Math.round(
-                    (subtotal * couponDoc.value) / 100
-                );
-            }
-
-            if (discountAmount > subtotal) {
-                discountAmount = subtotal;
-            }
+            if (discountAmount > subtotal) discountAmount = subtotal;
 
             couponDoc.usedCount += 1;
             await couponDoc.save({ session });
@@ -117,16 +117,14 @@ router.post("/", userAuth, async (req, res) => {
 
         const finalTotal = subtotal - discountAmount;
 
-        /* ===================================================
-           💰 WALLET PAYMENT
-        =================================================== */
+        /* ===============================
+           WALLET PAYMENT
+        ================================ */
         let paymentStatus = "pending";
         let orderStatus = "pending";
 
         if (paymentMethod === "wallet") {
-            const user = await User.findById(
-                req.user.userId
-            ).session(session);
+            const user = await User.findById(req.user.userId).session(session);
 
             if (!user) throw new Error("User not found");
 
@@ -134,13 +132,7 @@ router.post("/", userAuth, async (req, res) => {
                 throw new Error("Insufficient wallet balance");
             }
 
-            // ✅ USE YOUR HELPER METHOD
-            user.debitWallet(
-                finalTotal,
-                null,
-                "Wallet payment for order"
-            );
-
+            user.debitWallet(finalTotal, null, "Order payment");
             await user.save({ session });
 
             paymentStatus = "paid";
@@ -153,8 +145,8 @@ router.post("/", userAuth, async (req, res) => {
         const [order] = await Order.create(
             [
                 {
-                    userId: req.user.userId,
-                    items,
+                    user: req.user.userId,
+                    items: orderItems,
                     shipping,
                     totalAmount: finalTotal,
                     paymentMethod,
@@ -165,26 +157,6 @@ router.post("/", userAuth, async (req, res) => {
             ],
             { session }
         );
-
-        /* ===============================
-           LINK WALLET TRANSACTION TO ORDER
-        ================================ */
-        if (paymentMethod === "wallet") {
-            const user = await User.findById(
-                req.user.userId
-            ).session(session);
-
-            const lastTx =
-                user.walletTransactions[
-                user.walletTransactions.length - 1
-                ];
-
-            if (lastTx) {
-                lastTx.relatedOrder = order._id;
-            }
-
-            await user.save({ session });
-        }
 
         await session.commitTransaction();
         session.endSession();
@@ -201,7 +173,7 @@ router.post("/", userAuth, async (req, res) => {
         console.error("CREATE ORDER ERROR:", err);
 
         return res.status(400).json({
-            error: err.message || "Failed to create order",
+            error: err.message || "Order failed",
         });
     }
 });
@@ -212,42 +184,79 @@ router.post("/", userAuth, async (req, res) => {
 router.get("/my-orders", userAuth, async (req, res) => {
     try {
         const orders = await Order.find({
-            userId: req.user.userId,
+            user: req.user.userId,
         }).sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            orders,
-        });
+        res.json({ success: true, orders });
     } catch (err) {
-        console.error("FETCH MY ORDERS ERROR:", err);
-        res.status(500).json({
-            error: "Failed to fetch orders",
-        });
+        res.status(500).json({ error: "Failed to fetch orders" });
     }
 });
 
 /* ===================================================
-   REQUEST REFUND
+   GET SINGLE ORDER
+=================================================== */
+router.get("/:id", userAuth, async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: "Invalid order ID" });
+        }
+
+        const order = await Order.findOne({
+            _id: req.params.id,
+            user: req.user.userId,
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+
+        res.json(order);
+
+    } catch (err) {
+        res.status(500).json({ error: "Failed to load order" });
+    }
+});
+
+/* ===================================================
+   REQUEST REFUND (SAFE VERSION)
 =================================================== */
 router.post("/:id/refund-request", userAuth, async (req, res) => {
     try {
         const { reason } = req.body;
 
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: "Invalid order ID" });
+        }
+
         const order = await Order.findOne({
             _id: req.params.id,
-            userId: req.user.userId,
+            user: req.user.userId,
         });
 
         if (!order) {
-            return res.status(404).json({
-                error: "Order not found",
+            return res.status(404).json({ error: "Order not found" });
+        }
+
+        /* ===============================
+           SECURITY CHECKS
+        ================================ */
+
+        if (order.paymentStatus !== "paid") {
+            return res.status(400).json({
+                error: "Only paid orders can be refunded",
             });
         }
 
-        if (order.refundRequested) {
+        if (order.orderStatus !== "delivered") {
             return res.status(400).json({
-                error: "Refund already requested",
+                error: "Refund allowed only after delivery",
+            });
+        }
+
+        if (order.refundStatus !== "none") {
+            return res.status(400).json({
+                error: "Refund already processed/requested",
             });
         }
 
@@ -255,6 +264,7 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             "size_issue",
             "damaged_item",
             "wrong_item",
+            "change_of_mind",
         ];
 
         if (!allowedReasons.includes(reason)) {
@@ -263,10 +273,16 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             });
         }
 
+        /* ===============================
+           APPLY REFUND REQUEST
+        ================================ */
+
         order.refundRequested = true;
         order.refundRequestedAt = new Date();
         order.refundReason = reason;
         order.refundStatus = "requested";
+
+        order.addRefundTimeline("requested", reason);
 
         await order.save();
 
@@ -279,32 +295,6 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
         console.error("REFUND REQUEST ERROR:", err);
         res.status(500).json({
             error: "Failed to submit refund request",
-        });
-    }
-});
-
-/* ===================================================
-   GET SINGLE ORDER
-=================================================== */
-router.get("/:id", userAuth, async (req, res) => {
-    try {
-        const order = await Order.findOne({
-            _id: req.params.id,
-            userId: req.user.userId,
-        });
-
-        if (!order) {
-            return res.status(404).json({
-                error: "Order not found",
-            });
-        }
-
-        res.json(order);
-
-    } catch (err) {
-        console.error("FETCH ORDER ERROR:", err);
-        res.status(500).json({
-            error: "Failed to load order",
         });
     }
 });

@@ -34,8 +34,7 @@ const productSchema = new mongoose.Schema(
             type: [String],
             required: [true, "At least one image is required"],
             validate: {
-                validator: arr =>
-                    Array.isArray(arr) && arr.length > 0,
+                validator: arr => Array.isArray(arr) && arr.length > 0,
                 message: "At least one image is required",
             },
         },
@@ -53,7 +52,7 @@ const productSchema = new mongoose.Schema(
             min: [0, "Stock cannot be negative"],
         },
 
-        /* ================= VISIBILITY CONTROLS ================= */
+        /* ================= VISIBILITY ================= */
         showInShop: {
             type: Boolean,
             default: true,
@@ -82,6 +81,7 @@ const productSchema = new mongoose.Schema(
                     type: String,
                     lowercase: true,
                     trim: true,
+                    match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
                 },
                 createdAt: {
                     type: Date,
@@ -90,7 +90,6 @@ const productSchema = new mongoose.Schema(
             },
         ],
 
-        /* ================= 📊 ADMIN WAITLIST COUNT ================= */
         waitlistCount: {
             type: Number,
             default: 0,
@@ -101,31 +100,42 @@ const productSchema = new mongoose.Schema(
     }
 );
 
-/* ================= AUTO CLEAR WAITLIST WHEN RESTOCKED ================= */
-/**
- * IMPORTANT:
- * ❌ Do NOT use `next`
- * ✅ Modern Mongoose auto-handles sync pre hooks
- */
-productSchema.pre("save", function () {
-    if (this.isModified("stock") && this.stock > 0) {
-        this.waitlist = [];
-        this.waitlistCount = 0;
-    } else {
+/* ======================================================
+   AUTO CLEAR WAITLIST ONLY WHEN RESTOCKED (0 → >0)
+====================================================== */
+productSchema.pre("save", async function () {
+    if (!this.isModified("stock")) {
         this.waitlistCount = this.waitlist.length;
+        return;
     }
+
+    const existingProduct = await this.constructor
+        .findById(this._id)
+        .select("stock");
+
+    // Clear waitlist ONLY if previously out of stock
+    if (existingProduct && existingProduct.stock === 0 && this.stock > 0) {
+        this.waitlist = [];
+    }
+
+    this.waitlistCount = this.waitlist.length;
 });
 
-/* ================= PREVENT DUPLICATE WAITLIST EMAILS ================= */
+/* ======================================================
+   PREVENT DUPLICATE WAITLIST EMAILS
+====================================================== */
 productSchema.methods.addToWaitlist = function (email) {
+    const normalizedEmail = email.toLowerCase().trim();
+
     const exists = this.waitlist.some(
-        w => w.email?.toLowerCase() === email.toLowerCase()
+        w => w.email === normalizedEmail
     );
 
     if (exists) return false;
 
-    this.waitlist.push({ email });
+    this.waitlist.push({ email: normalizedEmail });
     this.waitlistCount = this.waitlist.length;
+
     return true;
 };
 

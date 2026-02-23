@@ -1,7 +1,7 @@
 import express from "express";
-import Order from "../models/order.js";
+import mongoose from "mongoose";
+import Order from "../models/Order.js";
 import User from "../models/User.js";
-import AdminWallet from "../models/AdminWallet.js";
 import adminAuth from "../middleware/adminAuth.js";
 import nodemailer from "nodemailer";
 
@@ -28,29 +28,25 @@ const refundEmailTemplate = (type, orderId, amount, reason = "") => {
         return {
             subject: "Your Refund Has Been Approved 🎉",
             html: `
-                <div style="font-family: Arial; background:#111; padding:30px; color:#fff;">
-                    <h2 style="color:#4ade80;">Refund Approved</h2>
-                    <p>Your refund for order <b>${orderId}</b> has been approved.</p>
-                    <p><b>Amount Credited:</b> NPR ${amount}</p>
-                    <p>The amount has been added to your wallet.</p>
-                    <br/>
-                    <p>Thank you for shopping with EXR.</p>
-                </div>
-            `,
+        <div style="font-family:Arial;background:#111;padding:30px;color:#fff;">
+          <h2 style="color:#4ade80;">Refund Approved</h2>
+          <p>Order <b>${orderId}</b></p>
+          <p><b>Amount:</b> NPR ${amount}</p>
+          <p>The amount has been credited to your wallet.</p>
+        </div>
+      `,
         };
     }
 
     return {
-        subject: "Your Refund Request Was Rejected",
+        subject: "Refund Request Rejected",
         html: `
-            <div style="font-family: Arial; background:#111; padding:30px; color:#fff;">
-                <h2 style="color:#f87171;">Refund Rejected</h2>
-                <p>Your refund request for order <b>${orderId}</b> was rejected.</p>
-                <p><b>Reason:</b> ${reason}</p>
-                <br/>
-                <p>If you have questions, contact support.</p>
-            </div>
-        `,
+      <div style="font-family:Arial;background:#111;padding:30px;color:#fff;">
+        <h2 style="color:#f87171;">Refund Rejected</h2>
+        <p>Order <b>${orderId}</b></p>
+        <p><b>Reason:</b> ${reason}</p>
+      </div>
+    `,
     };
 };
 
@@ -59,21 +55,24 @@ const refundEmailTemplate = (type, orderId, amount, reason = "") => {
 ======================================== */
 router.get("/", adminAuth(), async (req, res) => {
     try {
-        const orders = await Order.find().sort({ createdAt: -1 });
+        const orders = await Order.find()
+            .populate("user", "email fullName")
+            .sort({ createdAt: -1 });
+
         res.json({ success: true, orders });
-    } catch (err) {
+    } catch {
         res.status(500).json({ error: "Failed to fetch orders" });
     }
 });
 
 /* ========================================
-   UPDATE ORDER STATUS
+   UPDATE ORDER STATUS (SAFE)
 ======================================== */
 router.patch("/:id/status", adminAuth(), async (req, res) => {
     try {
         const { status } = req.body;
 
-        const allowedStatuses = [
+        const allowed = [
             "pending",
             "paid",
             "shipped",
@@ -82,58 +81,84 @@ router.patch("/:id/status", adminAuth(), async (req, res) => {
             "refunded",
         ];
 
-        if (!allowedStatuses.includes(status)) {
+        if (!allowed.includes(status)) {
             return res.status(400).json({ error: "Invalid status" });
         }
 
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({ error: "Order not found" });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: "Invalid order ID" });
         }
+
+        const order = await Order.findById(req.params.id);
+        if (!order) return res.status(404).json({ error: "Order not found" });
 
         order.orderStatus = status;
         await order.save();
 
-        res.json({ success: true, order });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to update status" });
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ error: "Status update failed" });
     }
 });
 
 /* ========================================
-   APPROVE REFUND
+   APPROVE REFUND (TRANSACTION SAFE)
 ======================================== */
 router.put("/refund/:orderId", adminAuth(), async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.orderId);
-        if (!order) return res.status(404).json({ error: "Order not found" });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-        if (order.orderStatus === "refunded") {
-            return res.status(400).json({ error: "Already refunded" });
+    try {
+        const { orderId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            throw new Error("Invalid order ID");
+        }
+
+        const order = await Order.findById(orderId).session(session);
+        if (!order) throw new Error("Order not found");
+
+        /* ===== SECURITY CHECKS ===== */
+        if (order.refundStatus !== "requested") {
+            throw new Error("Refund not in requested state");
         }
 
         if (order.paymentStatus !== "paid") {
-            return res.status(400).json({ error: "Only paid orders refundable" });
+            throw new Error("Only paid orders refundable");
         }
 
-        const user = await User.findById(order.user);
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (order.orderStatus !== "delivered") {
+            throw new Error("Refund allowed only after delivery");
+        }
 
-        /* CREDIT WALLET */
+        const user = await User.findById(order.user).session(session);
+        if (!user) throw new Error("User not found");
+
+        /* ===== CREDIT WALLET ===== */
         user.creditWallet(
             order.totalAmount,
             order._id,
-            `Refund approved for order ${order._id}`
+            `Refund for order ${order._id}`
         );
 
-        user.logActivity(
-            "refund_approved",
-            `Refund approved. NPR ${order.totalAmount} credited to wallet.`
-        );
+        await user.save({ session });
 
-        await user.save();
+        /* ===== UPDATE ORDER ===== */
+        order.refundStatus = "approved";
+        order.orderStatus = "refunded";
+        order.refundedAt = new Date();
+        order.refundedBy = req.admin._id;
+        order.refundAmount = order.totalAmount;
+        order.refundMethod = "wallet";
 
-        /* SEND EMAIL */
+        order.addRefundTimeline("approved", "Refund credited to wallet");
+
+        await order.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        /* ===== SEND EMAIL (AFTER COMMIT) ===== */
         const emailContent = refundEmailTemplate(
             "approved",
             order._id,
@@ -147,54 +172,62 @@ router.put("/refund/:orderId", adminAuth(), async (req, res) => {
             html: emailContent.html,
         });
 
-        /* UPDATE ORDER */
-        order.orderStatus = "refunded";
-        order.refundStatus = "approved";
-        order.refundedAt = new Date();
-        await order.save();
-
         res.json({
             success: true,
-            message: "Refund approved, wallet credited & email sent",
+            message: "Refund approved and wallet credited",
         });
 
     } catch (err) {
-        console.error("REFUND APPROVAL ERROR:", err);
-        res.status(500).json({ error: "Refund process failed" });
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error("REFUND APPROVAL ERROR:", err.message);
+
+        res.status(400).json({ error: err.message });
     }
 });
 
 /* ========================================
-   REJECT REFUND
+   REJECT REFUND (SAFE)
 ======================================== */
 router.put("/refund/:orderId/reject", adminAuth(), async (req, res) => {
     try {
         const { reason } = req.body;
+        const { orderId } = req.params;
 
-        const order = await Order.findById(req.params.orderId);
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            return res.status(400).json({ error: "Invalid order ID" });
+        }
+
+        const order = await Order.findById(orderId);
         if (!order) return res.status(404).json({ error: "Order not found" });
 
+        if (order.refundStatus !== "requested") {
+            return res.status(400).json({
+                error: "Refund not in requested state",
+            });
+        }
+
         order.refundStatus = "rejected";
-        order.refundRejectedReason = reason || "Refund request rejected";
-        order.refundRejectedAt = new Date();
+        order.refundRejectReason =
+            reason || "Refund request rejected";
+        order.refundedBy = req.admin._id;
+
+        order.addRefundTimeline(
+            "rejected",
+            order.refundRejectReason
+        );
+
         await order.save();
 
         const user = await User.findById(order.user);
 
         if (user) {
-            user.logActivity(
-                "refund_rejected",
-                `Refund rejected. Reason: ${order.refundRejectedReason}`
-            );
-
-            await user.save();
-
-            /* SEND EMAIL */
             const emailContent = refundEmailTemplate(
                 "rejected",
                 order._id,
                 0,
-                order.refundRejectedReason
+                order.refundRejectReason
             );
 
             await transporter.sendMail({
@@ -207,12 +240,12 @@ router.put("/refund/:orderId/reject", adminAuth(), async (req, res) => {
 
         res.json({
             success: true,
-            message: "Refund rejected & email sent",
+            message: "Refund rejected",
         });
 
     } catch (err) {
-        console.error("REFUND REJECTION ERROR:", err);
-        res.status(500).json({ error: "Refund rejection failed" });
+        console.error("REFUND REJECTION ERROR:", err.message);
+        res.status(400).json({ error: err.message });
     }
 });
 
@@ -225,19 +258,20 @@ router.get("/refund-analytics", adminAuth(), async (req, res) => {
         const approvedRefunds = await Order.countDocuments({
             refundStatus: "approved",
         });
+
         const rejectedRefunds = await Order.countDocuments({
             refundStatus: "rejected",
         });
 
+        const totalRefundAgg = await Order.aggregate([
+            { $match: { refundStatus: "approved" } },
+            { $group: { _id: null, total: { $sum: "$refundAmount" } } },
+        ]);
+
         const refundRate =
             totalOrders > 0
-                ? ((approvedRefunds / totalOrders) * 100).toFixed(2)
+                ? (approvedRefunds / totalOrders) * 100
                 : 0;
-
-        const refundAmountAgg = await Order.aggregate([
-            { $match: { refundStatus: "approved" } },
-            { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-        ]);
 
         res.json({
             success: true,
@@ -245,13 +279,14 @@ router.get("/refund-analytics", adminAuth(), async (req, res) => {
                 totalOrders,
                 approvedRefunds,
                 rejectedRefunds,
-                refundRate: Number(refundRate),
-                totalRefundAmount: refundAmountAgg[0]?.total || 0,
+                refundRate: Number(refundRate.toFixed(2)),
+                totalRefundAmount:
+                    totalRefundAgg[0]?.total || 0,
             },
         });
 
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch analytics" });
+    } catch {
+        res.status(500).json({ error: "Analytics failed" });
     }
 });
 

@@ -16,22 +16,19 @@ const roleLevels = {
 
 /* ======================================================
    ADMIN AUTH MIDDLEWARE
-   Usage:
-   adminAuth() → default admin access
-   adminAuth("owner") → owner only
-   adminAuth("editor") → editor and above
 ====================================================== */
 const adminAuth = (requiredRole = "admin") => {
     return async (req, res, next) => {
         try {
+            /* ===============================
+               CHECK AUTH HEADER
+            =============================== */
             const authHeader = req.headers.authorization;
 
-            /* ===============================
-               CHECK TOKEN EXISTS
-            ================================ */
-            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            if (!authHeader?.startsWith("Bearer ")) {
                 return res.status(401).json({
-                    error: "Authentication required",
+                    success: false,
+                    message: "Authentication required",
                 });
             }
 
@@ -39,50 +36,66 @@ const adminAuth = (requiredRole = "admin") => {
 
             /* ===============================
                VERIFY TOKEN
-            ================================ */
-            const decoded = jwt.verify(
-                token,
-                process.env.ADMIN_JWT_SECRET
-            );
+            =============================== */
+            let decoded;
 
-            if (!decoded.adminId) {
+            try {
+                decoded = jwt.verify(
+                    token,
+                    process.env.ADMIN_JWT_SECRET
+                );
+            } catch (error) {
+                if (error.name === "TokenExpiredError") {
+                    return res.status(401).json({
+                        success: false,
+                        message: "Token expired",
+                    });
+                }
+
                 return res.status(401).json({
-                    error: "Invalid token structure",
+                    success: false,
+                    message: "Invalid token",
+                });
+            }
+
+            if (!decoded?.adminId) {
+                return res.status(401).json({
+                    success: false,
+                    message: "Invalid token payload",
                 });
             }
 
             /* ===============================
-               FETCH ADMIN FROM DATABASE
-            ================================ */
-            const admin = await Admin.findById(decoded.adminId);
+               FETCH ADMIN
+            =============================== */
+            const admin = await Admin.findOne({
+                _id: decoded.adminId,
+                isActive: true,
+            }).select("_id name email role isActive");
 
             if (!admin) {
                 return res.status(401).json({
-                    error: "Admin not found",
-                });
-            }
-
-            if (!admin.isActive) {
-                return res.status(403).json({
-                    error: "Admin account disabled",
+                    success: false,
+                    message: "Admin not found or inactive",
                 });
             }
 
             /* ===============================
-               CHECK ROLE EXISTS
-            ================================ */
+               ROLE CHECK
+            =============================== */
             const userRoleLevel = roleLevels[admin.role] || 0;
             const requiredRoleLevel = roleLevels[requiredRole] || 0;
 
             if (userRoleLevel < requiredRoleLevel) {
                 return res.status(403).json({
-                    error: "Insufficient permissions",
+                    success: false,
+                    message: "Insufficient permissions",
                 });
             }
 
             /* ===============================
                ATTACH ADMIN TO REQUEST
-            ================================ */
+            =============================== */
             req.admin = {
                 id: admin._id,
                 name: admin.name,
@@ -93,8 +106,11 @@ const adminAuth = (requiredRole = "admin") => {
             next();
 
         } catch (err) {
-            return res.status(401).json({
-                error: "Token expired or invalid",
+            console.error("AdminAuth Error:", err.message);
+
+            return res.status(500).json({
+                success: false,
+                message: "Server authentication error",
             });
         }
     };

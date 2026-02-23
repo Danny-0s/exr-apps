@@ -1,17 +1,20 @@
 import express from "express";
+import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import adminAuth from "../middleware/adminAuth.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-/* ===============================
+/* ======================================================
    GET ALL PRODUCTS (PUBLIC)
-================================ */
+====================================================== */
 router.get("/", async (_req, res) => {
     try {
-        const products = await Product.find({ isActive: true })
-            .sort({ createdAt: -1 });
+        const products = await Product.find({
+            isActive: true,
+            showInShop: true,
+        }).sort({ createdAt: -1 });
 
         res.json(products);
     } catch (err) {
@@ -20,11 +23,15 @@ router.get("/", async (_req, res) => {
     }
 });
 
-/* ===============================
+/* ======================================================
    GET SINGLE PRODUCT (PUBLIC)
-================================ */
+====================================================== */
 router.get("/:id", async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: "Invalid product ID" });
+        }
+
         const product = await Product.findById(req.params.id);
 
         if (!product || !product.isActive) {
@@ -32,19 +39,21 @@ router.get("/:id", async (req, res) => {
         }
 
         res.json(product);
-    } catch {
-        res.status(400).json({ message: "Invalid product ID" });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
     }
 });
 
-/* ===============================
-   ❤️ WAITLIST JOIN (PUBLIC)
-================================ */
+/* ======================================================
+   WAITLIST JOIN (PUBLIC)
+====================================================== */
 router.post("/:id/waitlist", async (req, res) => {
     try {
-        const email = String(req.body.email || "")
-            .toLowerCase()
-            .trim();
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: "Invalid product ID" });
+        }
+
+        const email = String(req.body.email || "").toLowerCase().trim();
 
         if (!email) {
             return res.status(400).json({
@@ -77,6 +86,7 @@ router.post("/:id/waitlist", async (req, res) => {
             success: true,
             message: "Added to waitlist",
         });
+
     } catch (err) {
         console.error("Waitlist error:", err);
         res.status(500).json({
@@ -86,43 +96,17 @@ router.post("/:id/waitlist", async (req, res) => {
     }
 });
 
-/* ===============================
-   📊 WAITLIST (ADMIN ONLY)
-   GET /api/products/:id/waitlist
-================================ */
-router.get("/:id/waitlist", adminAuth, async (req, res) => {
+/* ======================================================
+   GET WAITLIST (ADMIN ONLY)
+====================================================== */
+router.get("/:id/admin-waitlist", adminAuth("admin"), async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id).select(
-            "title waitlist"
-        );
-
-        if (!product) {
-            return res.status(404).json({
-                message: "Product not found",
-            });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: "Invalid product ID" });
         }
 
-        res.json({
-            productId: product._id,
-            title: product.title,
-            waitlistCount: product.waitlist.length,
-            waitlist: product.waitlist,
-        });
-    } catch (err) {
-        console.error("Admin waitlist fetch error:", err);
-        res.status(500).json({
-            message: "Failed to fetch waitlist",
-        });
-    }
-});
-
-/* ===============================
-   ❤️ GET WAITLIST (ADMIN ONLY)
-================================ */
-router.get("/:id/waitlist", adminAuth, async (req, res) => {
-    try {
         const product = await Product.findById(req.params.id)
-            .select("title waitlist");
+            .select("title waitlist waitlistCount");
 
         if (!product) {
             return res.status(404).json({
@@ -135,9 +119,10 @@ router.get("/:id/waitlist", adminAuth, async (req, res) => {
             success: true,
             productId: product._id,
             title: product.title,
-            count: product.waitlist.length,
+            count: product.waitlistCount,
             waitlist: product.waitlist,
         });
+
     } catch (err) {
         console.error("Admin waitlist fetch error:", err);
         res.status(500).json({
@@ -147,12 +132,12 @@ router.get("/:id/waitlist", adminAuth, async (req, res) => {
     }
 });
 
-/* ===============================
+/* ======================================================
    CREATE PRODUCT (ADMIN)
-================================ */
+====================================================== */
 router.post(
     "/",
-    adminAuth,
+    adminAuth("admin"),
     upload.array("images", 6),
     async (req, res) => {
         try {
@@ -207,7 +192,8 @@ router.post(
                 isActive: true,
             });
 
-            res.json(product);
+            res.status(201).json(product);
+
         } catch (err) {
             console.error("Create product error:", err);
             res.status(500).json({ message: "Create failed" });
@@ -215,16 +201,59 @@ router.post(
     }
 );
 
-/* ===============================
-   DELETE PRODUCT (ADMIN)
-================================ */
-router.delete("/:id", adminAuth, async (req, res) => {
+/* ======================================================
+   UPDATE PRODUCT (ADMIN)
+====================================================== */
+router.put("/:id", adminAuth("admin"), async (req, res) => {
     try {
-        await Product.findByIdAndDelete(req.params.id);
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: "Invalid product ID" });
+        }
+
+        const updatedProduct = await Product.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedProduct) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found",
+            });
+        }
+
+        res.json(updatedProduct);
+
+    } catch (err) {
+        console.error("Update product error:", err);
+        res.status(500).json({ message: "Update failed" });
+    }
+});
+
+/* ======================================================
+   DELETE PRODUCT (ADMIN)
+====================================================== */
+router.delete("/:id", adminAuth("admin"), async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ message: "Invalid product ID" });
+        }
+
+        const product = await Product.findByIdAndDelete(req.params.id);
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found",
+            });
+        }
+
         res.json({ success: true });
+
     } catch (err) {
         console.error("Delete product error:", err);
-        res.status(400).json({ message: "Delete failed" });
+        res.status(500).json({ message: "Delete failed" });
     }
 });
 

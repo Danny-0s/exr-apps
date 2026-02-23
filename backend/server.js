@@ -39,7 +39,7 @@ import adminTeamRoutes from "./routes/adminTeamRoutes.js";
 import couponPublicRoutes from "./routes/couponPublicRoutes.js";
 
 /* ================= MODELS ================= */
-import Order from "./models/order.js";
+import Order from "./models/Order.js";
 import Settings from "./models/Settings.js";
 import Admin from "./models/Admin.js";
 

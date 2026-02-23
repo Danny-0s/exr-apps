@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FaEnvelope, FaInstagram, FaTiktok } from "react-icons/fa";
+import { Mail, Instagram, Music2 } from "lucide-react";
 import API_BASE_URL from "../utils/api";
 
 export default function Contact() {
@@ -15,7 +15,7 @@ export default function Contact() {
     });
 
     /* ===============================
-       LOAD CONTACT
+       LOAD CONTACT (SAFE)
     ================================ */
     useEffect(() => {
         const loadContact = async () => {
@@ -93,140 +93,144 @@ export default function Contact() {
        RENDER
     ================================ */
     return (
-        <section className="min-h-screen bg-black text-white exr-section">
-            <div className="exr-container grid grid-cols-1 md:grid-cols-2 gap-16">
+        <div className="relative min-h-screen bg-black text-white overflow-hidden">
 
-                {/* LEFT */}
-                <div>
-                    <p className="exr-label mb-6">
-                        GET IN TOUCH
-                    </p>
+            {/* 🔴 RED HERO ACCENT BACKGROUND */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-40 left-[-120px] w-[420px] h-[420px] bg-red-600 opacity-20 blur-[180px]" />
+                <div className="absolute bottom-20 right-[-120px] w-[420px] h-[420px] bg-red-600 opacity-20 blur-[180px]" />
+            </div>
 
-                    <h1 className="exr-title mb-8">
-                        {data?.title || "Contact Us"}
-                    </h1>
+            <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-20 py-20 md:py-28">
 
-                    {data?.subtitle && (
-                        <p className="exr-text mb-10">
-                            {data.subtitle}
-                        </p>
+                {/* TOP LABEL */}
+                <p className="tracking-[6px] text-xs md:text-sm text-gray-500 mb-6 uppercase">
+                    GET IN TOUCH
+                </p>
+
+                {/* TITLE */}
+                <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                    {data?.title ? (
+                        <>
+                            {data.title}{" "}
+                            <span className="text-red-600">.</span>
+                        </>
+                    ) : (
+                        <>
+                            Talk To The <span className="text-red-600">Brand.</span>
+                        </>
                     )}
+                </h1>
 
-                    <div className="space-y-6">
+                {/* SUBTITLE */}
+                <p className="text-gray-400 max-w-xl mb-14 leading-relaxed">
+                    {data?.subtitle ||
+                        "For inquiries regarding orders, collaborations, or general questions. We respond within 24 hours."}
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+
+                    {/* ================= LEFT SIDE ================= */}
+                    <div className="space-y-8">
+
+                        {/* EMAIL */}
                         {data?.email && (
                             <a
                                 href={`mailto:${data.email}`}
-                                className="flex items-center gap-4 group"
+                                className="flex items-center gap-6 group"
                             >
-                                <span className="icon-circle">
-                                    <FaEnvelope />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <div className="w-14 h-14 flex items-center justify-center rounded-full border border-red-600 shadow-[0_0_25px_rgba(220,38,38,0.6)]">
+                                    <Mail className="text-red-500" />
+                                </div>
+                                <span className="text-lg text-gray-300 group-hover:text-white transition">
                                     {data.email}
                                 </span>
                             </a>
                         )}
 
+                        {/* INSTAGRAM */}
                         {data?.instagram && (
                             <a
                                 href={data.instagram}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center gap-4 group"
+                                className="flex items-center gap-6 group"
                             >
-                                <span className="icon-circle">
-                                    <FaInstagram />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <div className="w-14 h-14 flex items-center justify-center rounded-full border border-gray-700 group-hover:border-red-600 transition">
+                                    <Instagram className="text-gray-400 group-hover:text-red-500 transition" />
+                                </div>
+                                <span className="text-lg text-gray-300 group-hover:text-white transition">
                                     Instagram
                                 </span>
                             </a>
                         )}
 
+                        {/* TIKTOK */}
                         {data?.tiktok && (
                             <a
                                 href={data.tiktok}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center gap-4 group"
+                                className="flex items-center gap-6 group"
                             >
-                                <span className="icon-circle">
-                                    <FaTiktok />
-                                </span>
-                                <span className="exr-text group-hover:opacity-100">
+                                <div className="w-14 h-14 flex items-center justify-center rounded-full border border-gray-700 group-hover:border-red-600 transition">
+                                    <Music2 className="text-gray-400 group-hover:text-red-500 transition" />
+                                </div>
+                                <span className="text-lg text-gray-300 group-hover:text-white transition">
                                     TikTok
                                 </span>
                             </a>
                         )}
                     </div>
-                </div>
 
-                {/* RIGHT */}
-                <form
-                    onSubmit={handleSubmit}
-                    className="exr-card"
-                >
-                    <input
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        placeholder="Name"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
-                        required
-                    />
-
-                    <input
-                        name="email"
-                        value={form.email}
-                        onChange={handleChange}
-                        placeholder="Email"
-                        type="email"
-                        className="w-full mb-4 p-3 bg-transparent border border-white/20"
-                        required
-                    />
-
-                    <textarea
-                        name="message"
-                        value={form.message}
-                        onChange={handleChange}
-                        placeholder="Message"
-                        rows={5}
-                        className="w-full mb-6 p-3 bg-transparent border border-white/20"
-                        required
-                    />
-
-                    <button
-                        disabled={sending}
-                        className="w-full border border-white py-3 tracking-widest hover:bg-white hover:text-black transition"
+                    {/* ================= RIGHT SIDE (FORM) ================= */}
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-6 max-w-xl"
                     >
-                        {sending ? "SENDING..." : "SEND"}
-                    </button>
-                </form>
+
+                        <input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder="Name"
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                            required
+                        />
+
+                        <input
+                            name="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            placeholder="Email"
+                            type="email"
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                            required
+                        />
+
+                        <textarea
+                            name="message"
+                            value={form.message}
+                            onChange={handleChange}
+                            rows="4"
+                            placeholder="Message"
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                            required
+                        />
+
+                        <button
+                            type="submit"
+                            disabled={sending}
+                            className="w-full py-4 rounded-lg border border-red-600 text-white tracking-widest font-semibold 
+                            shadow-[0_0_30px_rgba(220,38,38,0.8)]
+                            hover:bg-red-600 hover:shadow-[0_0_40px_rgba(220,38,38,1)]
+                            transition-all duration-300"
+                        >
+                            {sending ? "SENDING..." : "SEND"}
+                        </button>
+                    </form>
+                </div>
             </div>
-
-            {/* ICON STYLES */}
-            <style>{`
-                .icon-circle {
-                    width: 44px;
-                    height: 44px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 9999px;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    transition: all 0.3s ease;
-                }
-
-                .group:hover .icon-circle {
-                    border-color: white;
-                    box-shadow: 0 0 12px rgba(255,255,255,0.4);
-                    transform: scale(1.05);
-                }
-
-                .icon-circle svg {
-                    font-size: 18px;
-                }
-            `}</style>
-        </section>
+        </div>
     );
 }

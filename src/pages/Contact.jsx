@@ -15,7 +15,7 @@ export default function Contact() {
     });
 
     /* ===============================
-       LOAD CONTACT (SAFE)
+       LOAD CONTACT
     ================================ */
     useEffect(() => {
         const loadContact = async () => {
@@ -37,7 +37,7 @@ export default function Contact() {
     }, []);
 
     /* ===============================
-       FORM HANDLERS
+       FORM HANDLING
     ================================ */
     const handleChange = e => {
         setForm(prev => ({
@@ -95,15 +95,18 @@ export default function Contact() {
     return (
         <div className="relative min-h-screen bg-black text-white overflow-hidden">
 
-            {/* 🔴 RED HERO ACCENT BACKGROUND */}
+            {/* 🔴 FLOATING RED GLOW BACKGROUND */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-40 left-[-120px] w-[420px] h-[420px] bg-red-600 opacity-20 blur-[180px]" />
-                <div className="absolute bottom-20 right-[-120px] w-[420px] h-[420px] bg-red-600 opacity-20 blur-[180px]" />
+
+                <div className="absolute top-32 left-[-150px] w-[450px] h-[450px] bg-red-600 opacity-25 blur-[200px] glow-animate" />
+
+                <div className="absolute bottom-24 right-[-150px] w-[450px] h-[450px] bg-red-600 opacity-20 blur-[200px] glow-animate-reverse" />
+
             </div>
 
             <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-20 py-20 md:py-28">
 
-                {/* TOP LABEL */}
+                {/* LABEL */}
                 <p className="tracking-[6px] text-xs md:text-sm text-gray-500 mb-6 uppercase">
                     GET IN TOUCH
                 </p>
@@ -112,8 +115,7 @@ export default function Contact() {
                 <h1 className="text-4xl md:text-5xl font-bold mb-6">
                     {data?.title ? (
                         <>
-                            {data.title}{" "}
-                            <span className="text-red-600">.</span>
+                            {data.title} <span className="text-red-600">.</span>
                         </>
                     ) : (
                         <>
@@ -130,10 +132,9 @@ export default function Contact() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
 
-                    {/* ================= LEFT SIDE ================= */}
+                    {/* LEFT SIDE */}
                     <div className="space-y-8">
 
-                        {/* EMAIL */}
                         {data?.email && (
                             <a
                                 href={`mailto:${data.email}`}
@@ -148,7 +149,6 @@ export default function Contact() {
                             </a>
                         )}
 
-                        {/* INSTAGRAM */}
                         {data?.instagram && (
                             <a
                                 href={data.instagram}
@@ -165,7 +165,6 @@ export default function Contact() {
                             </a>
                         )}
 
-                        {/* TIKTOK */}
                         {data?.tiktok && (
                             <a
                                 href={data.tiktok}
@@ -183,29 +182,26 @@ export default function Contact() {
                         )}
                     </div>
 
-                    {/* ================= RIGHT SIDE (FORM) ================= */}
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-6 max-w-xl"
-                    >
+                    {/* RIGHT SIDE FORM */}
+                    <form onSubmit={handleSubmit} className="space-y-6 max-w-xl">
 
                         <input
                             name="name"
                             value={form.name}
                             onChange={handleChange}
                             placeholder="Name"
-                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                             required
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                         />
 
                         <input
                             name="email"
+                            type="email"
                             value={form.email}
                             onChange={handleChange}
                             placeholder="Email"
-                            type="email"
-                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                             required
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                         />
 
                         <textarea
@@ -214,8 +210,8 @@ export default function Contact() {
                             onChange={handleChange}
                             rows="4"
                             placeholder="Message"
-                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                             required
+                            className="w-full bg-transparent border border-red-600 rounded-lg px-5 py-4 focus:outline-none focus:ring-2 focus:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
                         />
 
                         <button
@@ -223,11 +219,12 @@ export default function Contact() {
                             disabled={sending}
                             className="w-full py-4 rounded-lg border border-red-600 text-white tracking-widest font-semibold 
                             shadow-[0_0_30px_rgba(220,38,38,0.8)]
-                            hover:bg-red-600 hover:shadow-[0_0_40px_rgba(220,38,38,1)]
+                            hover:bg-red-600 hover:shadow-[0_0_45px_rgba(220,38,38,1)]
                             transition-all duration-300"
                         >
                             {sending ? "SENDING..." : "SEND"}
                         </button>
+
                     </form>
                 </div>
             </div>

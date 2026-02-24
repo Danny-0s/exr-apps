@@ -1,6 +1,7 @@
 import { useCart } from "../context/CartContext";
 import { Link } from "react-router-dom";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE_URL from "../utils/api";
 
 export default function Cart() {
     const {
@@ -42,7 +43,7 @@ export default function Cart() {
                             <img
                                 src={
                                     item.images?.length
-                                        ? `http://localhost:4242${item.images[0]}`
+                                        ? `${API_BASE_URL}${item.images[0]}`
                                         : "/placeholder.png"
                                 }
                                 alt={item.title}
@@ -64,7 +65,6 @@ export default function Cart() {
 
                         {/* RIGHT */}
                         <div className="flex items-center gap-6">
-                            {/* QTY */}
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() =>
@@ -93,7 +93,6 @@ export default function Cart() {
                                 </button>
                             </div>
 
-                            {/* REMOVE */}
                             <button
                                 onClick={() =>
                                     removeFromCart(

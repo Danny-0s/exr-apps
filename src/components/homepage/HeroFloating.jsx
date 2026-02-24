@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
+import API_BASE_URL from "../utils/api";
 
 export default function HeroFloating({ data }) {
     const navigate = useNavigate();
@@ -13,11 +14,11 @@ export default function HeroFloating({ data }) {
         heroBackground,
         heroButtonText = "SHOP NOW",
         heroButtonLink = "/products",
-        heroProducts = [], // ARRAY OF PRODUCT IDS
+        heroProducts = [],
     } = data || {};
 
     /* ===============================
-       LOAD PRODUCTS BY ID (CORRECT)
+       LOAD PRODUCTS BY ID (PRODUCTION SAFE)
     ================================ */
     useEffect(() => {
         if (!Array.isArray(heroProducts) || heroProducts.length === 0) {
@@ -27,7 +28,7 @@ export default function HeroFloating({ data }) {
 
         Promise.all(
             heroProducts.map(id =>
-                fetch(`http://localhost:4242/api/products/${id}`)
+                fetch(`${API_BASE_URL}/api/products/${id}`)
                     .then(res => (res.ok ? res.json() : null))
                     .catch(() => null)
             )
@@ -47,7 +48,7 @@ export default function HeroFloating({ data }) {
             className="relative min-h-screen flex items-center px-6 md:px-20 overflow-hidden"
             style={{
                 backgroundImage: heroBackground
-                    ? `url(http://localhost:4242${heroBackground})`
+                    ? `url(${API_BASE_URL}${heroBackground})`
                     : "none",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
@@ -92,7 +93,7 @@ export default function HeroFloating({ data }) {
                         >
                             {p.images?.[0] && (
                                 <img
-                                    src={`http://localhost:4242${p.images[0]}`}
+                                    src={`${API_BASE_URL}${p.images[0]}`}
                                     alt={p.title}
                                     className="w-full h-48 object-cover"
                                 />

@@ -1,32 +1,30 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import API_BASE_URL from "../../utils/api";
 
 export default function ProductSection({ data }) {
     const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    /* ================= SAFE DATA ================= */
     const {
         title = "Featured Products",
         limit = 4,
         category = "",
-        source = "latest", // latest | featured
+        source = "latest",
     } = data || {};
 
-    /* ================= LOAD PRODUCTS ================= */
     useEffect(() => {
         let mounted = true;
 
         axios
-            .get("http://localhost:4242/api/products")
+            .get(`${API_BASE_URL}/api/products`)
             .then(res => {
                 if (!mounted) return;
 
                 let list = Array.isArray(res.data) ? res.data : [];
 
-                /* CATEGORY FILTER */
                 if (category) {
                     list = list.filter(
                         p =>
@@ -35,12 +33,10 @@ export default function ProductSection({ data }) {
                     );
                 }
 
-                /* FEATURED FILTER */
                 if (source === "featured") {
                     list = list.filter(p => p.featured === true);
                 }
 
-                /* SORT */
                 if (source === "latest") {
                     list = [...list].sort(
                         (a, b) =>
@@ -48,7 +44,6 @@ export default function ProductSection({ data }) {
                     );
                 }
 
-                /* LIMIT */
                 list = list.slice(0, Number(limit) || 4);
 
                 setProducts(list);
@@ -65,7 +60,6 @@ export default function ProductSection({ data }) {
         };
     }, [limit, category, source]);
 
-    /* ================= LOADING ================= */
     if (loading) {
         return (
             <section className="py-24 text-center text-zinc-500">
@@ -74,7 +68,6 @@ export default function ProductSection({ data }) {
         );
     }
 
-    /* ================= EMPTY ================= */
     if (!products.length) {
         return (
             <section className="py-24 text-center text-zinc-500">
@@ -83,7 +76,6 @@ export default function ProductSection({ data }) {
         );
     }
 
-    /* ================= RENDER ================= */
     return (
         <section className="bg-black text-white py-24 px-6 md:px-12">
             {title && (
@@ -106,36 +98,26 @@ export default function ProductSection({ data }) {
                             onClick={() =>
                                 navigate(`/products/${product._id}`)
                             }
-                            className="
-                                cursor-pointer
-                                border border-zinc-800
-                                p-4
-                                hover:border-white
-                                transition
-                            "
+                            className="cursor-pointer border border-zinc-800 p-4 hover:border-white transition"
                         >
-                            {/* IMAGE */}
                             {image && (
                                 <div className="mb-4 overflow-hidden">
                                     <img
-                                        src={`http://localhost:4242${image}`}
+                                        src={`${API_BASE_URL}${image}`}
                                         alt={product.title}
                                         className="w-full h-48 object-cover transition hover:scale-105"
                                     />
                                 </div>
                             )}
 
-                            {/* TITLE */}
                             <h3 className="text-sm tracking-wide mb-1">
                                 {product.title}
                             </h3>
 
-                            {/* PRICE */}
                             <p className="text-sm opacity-60">
                                 ${product.price}
                             </p>
 
-                            {/* SOLD OUT */}
                             {product.stock === 0 && (
                                 <p className="text-xs text-red-500 mt-1">
                                     SOLD OUT

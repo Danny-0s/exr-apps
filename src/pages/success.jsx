@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE_URL from "../utils/api";
 
 export default function Success() {
     const { clearCart } = useCart();
@@ -9,13 +10,12 @@ export default function Success() {
 
     const orderId = searchParams.get("orderId");
     const payment = searchParams.get("payment") || "stripe";
-    const pidx = searchParams.get("pidx"); // Khalti
+    const pidx = searchParams.get("pidx");
 
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    /* ================= VERIFY + LOAD ================= */
     useEffect(() => {
         const processSuccess = async () => {
             if (!orderId) {
@@ -25,10 +25,10 @@ export default function Success() {
             }
 
             try {
-                // ✅ Verify Khalti ONLY if needed
+                // Verify Khalti only if needed
                 if (payment === "khalti" && pidx) {
                     const verifyRes = await fetch(
-                        "http://localhost:4242/api/payments/khalti/verify",
+                        `${API_BASE_URL}/api/payments/khalti/verify`,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -41,9 +41,9 @@ export default function Success() {
                     }
                 }
 
-                // ✅ Load order AFTER verification
+                // Load order after verification
                 const res = await fetch(
-                    `http://localhost:4242/api/orders/${orderId}`
+                    `${API_BASE_URL}/api/orders/${orderId}`
                 );
 
                 if (!res.ok) {
@@ -53,7 +53,7 @@ export default function Success() {
                 const data = await res.json();
                 setOrder(data);
 
-                // ✅ Clear cart ONLY after success
+                // Clear cart only after success
                 clearCart();
             } catch (err) {
                 console.error(err);
@@ -66,7 +66,6 @@ export default function Success() {
         processSuccess();
     }, [orderId, payment, pidx, clearCart]);
 
-    /* ================= LOADING ================= */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center opacity-60">
@@ -75,7 +74,6 @@ export default function Success() {
         );
     }
 
-    /* ================= ERROR ================= */
     if (error || !order) {
         return (
             <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-6">
@@ -92,7 +90,6 @@ export default function Success() {
         );
     }
 
-    /* ================= CALCULATIONS ================= */
     const subtotal = order.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
@@ -103,7 +100,6 @@ export default function Success() {
         order.totalAmount - subtotal
     );
 
-    /* ================= SUCCESS ================= */
     return (
         <div className="min-h-screen bg-black text-white px-6 py-16 flex justify-center">
             <div className="max-w-xl w-full border border-zinc-800 p-8 space-y-6">
@@ -117,7 +113,6 @@ export default function Success() {
                     was successful.
                 </p>
 
-                {/* SHIPPING */}
                 <div className="border-t border-zinc-800 pt-6 text-sm space-y-1">
                     <h2 className="tracking-widest opacity-60 mb-2">
                         SHIPPING DETAILS
@@ -134,7 +129,6 @@ export default function Success() {
                     )}
                 </div>
 
-                {/* SUMMARY */}
                 <div className="border-t border-zinc-800 pt-6 text-sm space-y-2">
                     <h2 className="tracking-widest opacity-60 mb-2">
                         ORDER SUMMARY
@@ -168,7 +162,6 @@ export default function Success() {
                     )}
                 </div>
 
-                {/* ACTIONS */}
                 <div className="flex justify-center gap-4 pt-4">
                     <Link
                         to="/shop"

@@ -3,3 +3,4 @@
 server/.env
 server/.env.save
 node_modules
+dist

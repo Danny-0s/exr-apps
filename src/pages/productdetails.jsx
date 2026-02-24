@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE_URL from "../utils/api";
 
 export default function ProductDetails() {
     const { id } = useParams();
@@ -12,7 +13,6 @@ export default function ProductDetails() {
     const [selectedSize, setSelectedSize] = useState(null);
     const [activeImage, setActiveImage] = useState(0);
 
-    /* ❤️ WAITLIST STATE (LOCAL ONLY) */
     const [isWaitlisted, setIsWaitlisted] = useState(false);
 
     /* ================= FETCH PRODUCT ================= */
@@ -20,7 +20,7 @@ export default function ProductDetails() {
         const fetchProduct = async () => {
             try {
                 const res = await fetch(
-                    `http://localhost:4242/api/products/${id}`
+                    `${API_BASE_URL}/api/products/${id}`
                 );
                 const data = await res.json();
                 setProduct(data);
@@ -41,7 +41,6 @@ export default function ProductDetails() {
         fetchProduct();
     }, [id]);
 
-    /* ================= LOADING / ERROR ================= */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -58,12 +57,10 @@ export default function ProductDetails() {
         );
     }
 
-    /* ================= SAFE DATA ================= */
     const images = Array.isArray(product.images) ? product.images : [];
     const sizes = Array.isArray(product.sizes) ? product.sizes : [];
     const showWaitlist = product.stock !== 0;
 
-    /* ================= ADD TO CART ================= */
     const handleAddToCart = () => {
         if (!selectedSize) {
             alert("Please select a size");
@@ -80,7 +77,6 @@ export default function ProductDetails() {
         });
     };
 
-    /* ================= ❤️ WAITLIST TOGGLE ================= */
     const toggleWaitlist = () => {
         const stored =
             JSON.parse(
@@ -112,7 +108,7 @@ export default function ProductDetails() {
             <div>
                 {images.length > 0 && (
                     <img
-                        src={`http://localhost:4242${images[activeImage]}`}
+                        src={`${API_BASE_URL}${images[activeImage]}`}
                         className="w-full h-[520px] object-cover border mb-6"
                         alt={product.title}
                     />
@@ -122,12 +118,13 @@ export default function ProductDetails() {
                     {images.map((img, i) => (
                         <img
                             key={i}
-                            src={`http://localhost:4242${img}`}
+                            src={`${API_BASE_URL}${img}`}
                             onClick={() => setActiveImage(i)}
                             className={`w-20 h-20 object-cover border cursor-pointer ${i === activeImage
                                     ? "border-white"
                                     : "border-zinc-700"
                                 }`}
+                            alt="thumbnail"
                         />
                     ))}
                 </div>
@@ -161,7 +158,6 @@ export default function ProductDetails() {
                     </p>
                 )}
 
-                {/* ================= SIZES ================= */}
                 {sizes.length > 0 && (
                     <div className="mb-10">
                         <p className="text-xs tracking-widest opacity-60 mb-3">
@@ -185,7 +181,6 @@ export default function ProductDetails() {
                     </div>
                 )}
 
-                {/* ================= ACTIONS ================= */}
                 <div className="flex items-center gap-4">
                     <button
                         disabled={product.stock === 0}

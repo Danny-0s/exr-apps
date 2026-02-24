@@ -1,6 +1,7 @@
 import { useCart } from "../context/CartContext";
 import { useState, useMemo, useEffect } from "react";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE_URL from "../utils/api";
 
 const KATHMANDU_VALLEY_CITIES = ["kathmandu", "lalitpur", "bhaktapur"];
 
@@ -24,7 +25,7 @@ export default function Checkout() {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/settings");
+                const res = await fetch(`${API_BASE_URL}/api/settings`);
                 if (!res.ok) throw new Error();
                 const data = await res.json();
                 setSettings(data);
@@ -37,7 +38,6 @@ export default function Checkout() {
         fetchSettings();
     }, []);
 
-    /* ================= EMPTY CART ================= */
     if (cart.length === 0) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center opacity-60">
@@ -46,7 +46,6 @@ export default function Checkout() {
         );
     }
 
-    /* ================= TOTALS ================= */
     const subtotal = useMemo(
         () => cart.reduce((sum, i) => sum + i.price * i.quantity, 0),
         [cart]
@@ -64,7 +63,6 @@ export default function Checkout() {
 
     const grandTotal = subtotal + shippingFee;
 
-    /* ================= VALIDATION ================= */
     const validateShipping = () => {
         const required = [
             shipping.fullName,
@@ -81,7 +79,6 @@ export default function Checkout() {
         return true;
     };
 
-    /* ================= CREATE ORDER ================= */
     const createOrder = async paymentMethod => {
         const orderItems = cart.map(item => ({
             _id: item._id || item.id,
@@ -91,7 +88,7 @@ export default function Checkout() {
             image: item.image || "",
         }));
 
-        const res = await fetch("http://localhost:4242/api/orders", {
+        const res = await fetch(`${API_BASE_URL}/api/orders`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -113,7 +110,6 @@ export default function Checkout() {
         return await res.json();
     };
 
-    /* ================= PAYMENTS ================= */
     const handleCOD = async () => {
         if (!validateShipping()) return;
         setLoading(true);
@@ -134,7 +130,7 @@ export default function Checkout() {
             const { orderId } = await createOrder("stripe");
 
             const res = await fetch(
-                "http://localhost:4242/create-checkout-session",
+                `${API_BASE_URL}/create-checkout-session`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -165,8 +161,8 @@ export default function Checkout() {
                 tAmt: grandTotal,
                 pid: orderId,
                 scd: "EPAYTEST",
-                su: `http://localhost:5173/success?orderId=${orderId}&payment=esewa`,
-                fu: "http://localhost:5173/cart",
+                su: `${window.location.origin}/success?orderId=${orderId}&payment=esewa`,
+                fu: `${window.location.origin}/cart`,
             };
 
             Object.entries(fields).forEach(([k, v]) => {
@@ -192,7 +188,7 @@ export default function Checkout() {
             const { orderId } = await createOrder("khalti");
 
             const res = await fetch(
-                "http://localhost:4242/api/payments/khalti/initiate",
+                `${API_BASE_URL}/api/payments/khalti/initiate`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -208,14 +204,12 @@ export default function Checkout() {
         }
     };
 
-    /* ================= UI ================= */
     return (
         <div className="min-h-screen bg-black text-white px-8 py-12 max-w-5xl mx-auto">
             <h1 className="text-2xl tracking-widest mb-10">
                 CHECKOUT
             </h1>
 
-            {/* SHIPPING */}
             <div className="border border-zinc-800 p-6 mb-10 space-y-4">
                 {["fullName", "phone", "address", "city", "province"].map(field => (
                     <input
@@ -233,7 +227,6 @@ export default function Checkout() {
                 ))}
             </div>
 
-            {/* TOTALS */}
             <div className="space-y-3 mb-10 text-sm">
                 <div className="flex justify-between">
                     <span>Subtotal</span>
@@ -251,7 +244,6 @@ export default function Checkout() {
                 </div>
             </div>
 
-            {/* PAYMENTS */}
             <div className="flex flex-col gap-4">
                 {settings?.codEnabled && (
                     <button

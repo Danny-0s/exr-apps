@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
 import { FaInstagram, FaTiktok, FaEnvelope } from "react-icons/fa";
+import API_BASE_URL from "../../utils/api";
 
 /* ===============================
    HELPERS
@@ -44,7 +45,7 @@ function HeroClassic({ data }) {
             style={
                 heroBackground
                     ? {
-                        backgroundImage: `url(http://localhost:4242${heroBackground})`,
+                        backgroundImage: `url(${API_BASE_URL}${heroBackground})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                     }
@@ -75,7 +76,7 @@ function HeroClassic({ data }) {
 }
 
 /* ===============================
-   HERO – PRODUCTS (PER HERO)
+   HERO – PRODUCTS
 ================================ */
 function HeroProducts({ data }) {
     if (!data?.heroProducts?.length) {
@@ -105,7 +106,7 @@ function HeroProducts({ data }) {
 }
 
 /* ===============================
-   CONTACT – BASE44 STYLE
+   CONTACT
 ================================ */
 function ContactSection({ data }) {
     if (!data) return null;
@@ -121,7 +122,6 @@ function ContactSection({ data }) {
     return (
         <section className="min-h-screen bg-black text-white px-6 md:px-20 py-32">
             <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-20">
-                {/* LEFT */}
                 <div>
                     <p className="tracking-widest text-sm opacity-70 mb-6">
                         GET IN TOUCH
@@ -155,7 +155,6 @@ function ContactSection({ data }) {
                     )}
                 </div>
 
-                {/* RIGHT */}
                 <form
                     className="border border-zinc-800 p-10"
                     onSubmit={e => e.preventDefault()}
@@ -187,7 +186,7 @@ function ContactSection({ data }) {
 }
 
 /* ===============================
-   SECTION RENDERER (FINAL)
+   SECTION RENDERER
 ================================ */
 export default function SectionRenderer({ section }) {
     if (!section || section.enabled === false) return null;

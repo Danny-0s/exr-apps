@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import API_BASE_URL from "../utils/api";
 
 export default function Products() {
     const [products, setProducts] = useState([]);
@@ -21,7 +22,7 @@ export default function Products() {
     useEffect(() => {
         const loadProducts = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/products");
+                const res = await fetch(`${API_BASE_URL}/api/products`);
                 if (!res.ok) throw new Error("Failed to fetch products");
 
                 const data = await res.json();
@@ -69,7 +70,6 @@ export default function Products() {
         );
         setWaitlisted(updated);
 
-        /* 🔔 notify navbar instantly */
         window.dispatchEvent(new Event("waitlist-updated"));
     };
 
@@ -118,7 +118,7 @@ export default function Products() {
                     const isWaitlisted =
                         waitlisted.includes(product._id);
 
-                    const showHeart = product.stock !== 0; // ✅ RULE
+                    const showHeart = product.stock !== 0;
 
                     return (
                         <Link
@@ -126,14 +126,11 @@ export default function Products() {
                             to={`/products/${product._id}`}
                             className="group relative border border-zinc-800 p-4 hover:border-white transition"
                         >
-                            {/* ❤️ HEART (ONLY WHEN stock !== 0) */}
+                            {/* ❤️ HEART */}
                             {showHeart && (
                                 <button
                                     onClick={e =>
-                                        toggleWaitlist(
-                                            e,
-                                            product._id
-                                        )
+                                        toggleWaitlist(e, product._id)
                                     }
                                     className={`absolute top-3 right-3 z-10 text-xl transition ${isWaitlisted
                                             ? "text-red-500"
@@ -148,7 +145,7 @@ export default function Products() {
                             {image && (
                                 <div className="mb-4 overflow-hidden">
                                     <img
-                                        src={`http://localhost:4242${image}`}
+                                        src={`${API_BASE_URL}${image}`}
                                         alt={product.title}
                                         className="w-full h-48 object-cover transition group-hover:scale-105"
                                     />

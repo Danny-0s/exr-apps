@@ -75,9 +75,7 @@ const shippingSchema = new mongoose.Schema(
 ===================================================== */
 const orderSchema = new mongoose.Schema(
     {
-        /* ===============================
-           USER (LOGIN REQUIRED)
-        ================================ */
+        /* USER */
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -85,35 +83,27 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ===============================
-           ORDER ITEMS
-        ================================ */
+        /* ORDER ITEMS */
         items: {
             type: [orderItemSchema],
-            validate: v => v.length > 0,
+            validate: (v) => v.length > 0,
             required: true,
         },
 
-        /* ===============================
-           SHIPPING INFO
-        ================================ */
+        /* SHIPPING */
         shipping: {
             type: shippingSchema,
             required: true,
         },
 
-        /* ===============================
-           TOTAL AMOUNT
-        ================================ */
+        /* TOTAL */
         totalAmount: {
             type: Number,
             required: true,
             min: 0,
         },
 
-        /* ===============================
-           PAYMENT METHOD
-        ================================ */
+        /* PAYMENT METHOD */
         paymentMethod: {
             type: String,
             enum: ["stripe", "cod", "esewa", "khalti", "wallet"],
@@ -121,9 +111,7 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ===============================
-           PAYMENT STATUS
-        ================================ */
+        /* PAYMENT STATUS */
         paymentStatus: {
             type: String,
             enum: ["pending", "paid", "failed", "refunded"],
@@ -131,9 +119,7 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ===============================
-           ORDER STATUS
-        ================================ */
+        /* ORDER STATUS */
         orderStatus: {
             type: String,
             enum: [
@@ -149,9 +135,7 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ===============================
-           STRIPE META
-        ================================ */
+        /* STRIPE META */
         stripeSessionId: {
             type: String,
             default: null,
@@ -164,9 +148,7 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ===============================
-           COUPON SNAPSHOT
-        ================================ */
+        /* COUPON SNAPSHOT */
         coupon: {
             code: { type: String, trim: true },
             type: { type: String, trim: true },
@@ -174,9 +156,7 @@ const orderSchema = new mongoose.Schema(
             discount: { type: Number, min: 0 },
         },
 
-        /* ===============================
-           REFUND META
-        ================================ */
+        /* REFUND FLAGS */
         refundRequested: {
             type: Boolean,
             default: false,
@@ -235,17 +215,13 @@ const orderSchema = new mongoose.Schema(
             default: null,
         },
 
-        /* ===============================
-           REFUND TIMELINE
-        ================================ */
+        /* REFUND TIMELINE */
         refundTimeline: {
             type: [refundTimelineSchema],
             default: [],
         },
 
-        /* ===============================
-           ANALYTICS FLAGS
-        ================================ */
+        /* ANALYTICS */
         analytics: {
             refundProcessed: {
                 type: Boolean,
@@ -259,7 +235,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 /* =====================================================
-   INDEXES (PRODUCTION PERFORMANCE)
+   INDEXES
 ===================================================== */
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ user: 1, createdAt: -1 });
@@ -292,12 +268,16 @@ orderSchema.methods.markAsRefunded = function (adminId, amount, method) {
    PRE-SAVE VALIDATION
 ===================================================== */
 orderSchema.pre("save", function (next) {
-    // Prevent refund amount greater than total
     if (this.refundAmount > this.totalAmount) {
         return next(new Error("Refund amount cannot exceed total amount"));
     }
-
     next();
 });
 
-export default mongoose.model("Order", orderSchema);
+/* =====================================================
+   SAFE EXPORT (Prevents OverwriteModelError)
+===================================================== */
+const Order =
+    mongoose.models.Order || mongoose.model("Order", orderSchema);
+
+export default Order;

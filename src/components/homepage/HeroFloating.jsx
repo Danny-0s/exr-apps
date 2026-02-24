@@ -18,9 +18,11 @@ export default function HeroFloating({ data }) {
     } = data || {};
 
     /* ===============================
-       LOAD PRODUCTS BY ID (PRODUCTION SAFE)
+       LOAD PRODUCTS BY ID
     ================================ */
     useEffect(() => {
+        let mounted = true;
+
         if (!Array.isArray(heroProducts) || heroProducts.length === 0) {
             setProducts([]);
             return;
@@ -33,8 +35,13 @@ export default function HeroFloating({ data }) {
                     .catch(() => null)
             )
         ).then(result => {
+            if (!mounted) return;
             setProducts(result.filter(Boolean));
         });
+
+        return () => {
+            mounted = false;
+        };
     }, [heroProducts]);
 
     /* FADE IN */
@@ -49,7 +56,7 @@ export default function HeroFloating({ data }) {
             style={{
                 backgroundImage: heroBackground
                     ? `url(${API_BASE_URL}${heroBackground})`
-                    : "none",
+                    : undefined,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
             }}
@@ -58,16 +65,22 @@ export default function HeroFloating({ data }) {
 
             {/* TEXT */}
             <div
-                className={`relative z-10 max-w-xl transition-all duration-1000 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+                className={`relative z-10 max-w-xl transition-all duration-1000 ${visible
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 translate-y-6"
                     }`}
             >
-                <h1 className="text-4xl md:text-6xl tracking-[0.35em] mb-6">
-                    {heroTitle}
-                </h1>
+                {heroTitle && (
+                    <h1 className="text-4xl md:text-6xl tracking-[0.35em] mb-6">
+                        {heroTitle}
+                    </h1>
+                )}
 
-                <p className="opacity-70 tracking-widest mb-12">
-                    {heroSubtitle}
-                </p>
+                {heroSubtitle && (
+                    <p className="opacity-70 tracking-widest mb-12">
+                        {heroSubtitle}
+                    </p>
+                )}
 
                 <Button
                     variant="outline"
@@ -91,10 +104,10 @@ export default function HeroFloating({ data }) {
                                 }`}
                             style={{ transitionDelay: `${i * 150}ms` }}
                         >
-                            {p.images?.[0] && (
+                            {p?.images?.[0] && (
                                 <img
                                     src={`${API_BASE_URL}${p.images[0]}`}
-                                    alt={p.title}
+                                    alt={p.title || "product"}
                                     className="w-full h-48 object-cover"
                                 />
                             )}

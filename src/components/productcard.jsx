@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import API_BASE_URL from "../utils/api";
 
 export default function ProductCard({ product }) {
     const { addToCart } = useCart();
@@ -7,7 +8,7 @@ export default function ProductCard({ product }) {
     return (
         <div className="bg-black border p-4">
             <img
-                src={`http://localhost:4242${product.image}`}
+                src={`${API_BASE_URL}${product.image}`}
                 alt={product.title}
                 className="w-full h-64 object-cover mb-4"
             />

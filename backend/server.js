@@ -41,7 +41,7 @@ import couponPublicRoutes from "./routes/couponPublicRoutes.js";
 import adminAnalyticsRoutes from "./routes/adminAnalyticsRoutes.js";
 
 /* ================= MODELS ================= */
-import Order from "./models/OrderTemp.js";
+import Order from "./models/Order.js";
 import Settings from "./models/Settings.js";
 import Admin from "./models/Admin.js";
 

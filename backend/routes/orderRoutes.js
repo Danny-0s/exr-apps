@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import Order from "../models/OrderTemp.js";
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";

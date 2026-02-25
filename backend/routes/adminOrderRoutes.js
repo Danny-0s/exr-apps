@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import Order from "../models/OrderTemp.js";
+import Order from "../models/Order.js";
 import User from "../models/User.js";
 import adminAuth from "../middleware/adminAuth.js";
 import nodemailer from "nodemailer";

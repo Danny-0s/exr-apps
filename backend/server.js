@@ -8,7 +8,6 @@ import Stripe from "stripe";
 import path from "path";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 
 import connectDB from "./config/db.js";
@@ -38,13 +37,16 @@ import adminUserRoutes from "./routes/adminUserRoutes.js";
 import adminTeamRoutes from "./routes/adminTeamRoutes.js";
 import couponPublicRoutes from "./routes/couponPublicRoutes.js";
 
+/* 🔥 NEW ANALYTICS ROUTE */
+import adminAnalyticsRoutes from "./routes/adminAnalyticsRoutes.js";
+
 /* ================= MODELS ================= */
-import Order from "./models/Order.js";
+import Order from "./models/OrderTemp.js";
 import Settings from "./models/Settings.js";
 import Admin from "./models/Admin.js";
 
 const app = express();
-app.set("trust proxy", 1); // Required for Render / reverse proxy
+app.set("trust proxy", 1);
 
 connectDB();
 
@@ -54,7 +56,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
    🔐 GLOBAL SECURITY
 ===================================================== */
 
-app.disable("x-powered-by"); // Hide Express fingerprint
+app.disable("x-powered-by");
 
 app.use(
     helmet({
@@ -62,15 +64,13 @@ app.use(
     })
 );
 
-app.use(mongoSanitize()); // Prevent Mongo injection
-app.use(hpp()); // Prevent HTTP param pollution
+app.use(hpp());
 
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
-    message: "Too many requests. Please try again later.",
 });
 
 app.use(globalLimiter);
@@ -82,7 +82,6 @@ const adminLoginLimiter = rateLimit({
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    message: "Too many login attempts. Try again later.",
 });
 
 /* ================= CORS ================= */
@@ -96,7 +95,6 @@ app.use(
     cors({
         origin: function (origin, callback) {
             if (!origin) return callback(null, true);
-
             if (allowedOrigins.includes(origin)) {
                 callback(null, true);
             } else {
@@ -116,20 +114,14 @@ app.post(
     express.raw({ type: "application/json" }),
     async (req, res) => {
         const sig = req.headers["stripe-signature"];
-        let event;
 
         try {
-            event = stripe.webhooks.constructEvent(
+            const event = stripe.webhooks.constructEvent(
                 req.body,
                 sig,
                 process.env.STRIPE_WEBHOOK_SECRET
             );
-        } catch (err) {
-            console.error("Webhook signature failed");
-            return res.status(400).send("Webhook Error");
-        }
 
-        try {
             if (event.type === "checkout.session.completed") {
                 const session = event.data.object;
                 const orderId = session.metadata?.orderId;
@@ -144,9 +136,10 @@ app.post(
             }
 
             res.json({ received: true });
+
         } catch (err) {
-            console.error("Webhook handler error:", err);
-            res.status(500).json({ error: "Webhook handler failed" });
+            console.error("Stripe webhook error:", err.message);
+            res.status(400).send("Webhook Error");
         }
     }
 );
@@ -165,16 +158,7 @@ app.use("/uploads", express.static(path.resolve("uploads")));
 app.get("/api/settings", async (_req, res) => {
     try {
         const settings = await Settings.getSingleton();
-
-        res.json({
-            codEnabled: settings.codEnabled,
-            stripeEnabled: settings.stripeEnabled,
-            esewaEnabled: settings.esewaEnabled,
-            khaltiEnabled: settings.khaltiEnabled,
-            shippingInsideValley: settings.shippingInsideValley,
-            shippingOutsideValley: settings.shippingOutsideValley,
-            maintenanceMode: settings.maintenanceMode,
-        });
+        res.json(settings);
     } catch {
         res.status(500).json({ error: "Failed to load settings" });
     }
@@ -189,22 +173,31 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/seo", seoRoutes);
 app.use("/api/coupons", couponPublicRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-
-/* ================= USER AUTH ================= */
-
 app.use("/api/auth", authRoutes);
-
-/* ================= PAYMENT ================= */
-
 app.use("/api/payments/khalti", khaltiRoutes);
 app.use("/api/payments/esewa", esewaRoutes);
+
+/* ================= ADMIN VERIFY ================= */
+
+app.get("/api/admin/verify", adminAuth("admin"), (req, res) => {
+    res.json({
+        success: true,
+        admin: {
+            id: req.admin._id,
+            role: req.admin.role,
+        },
+    });
+});
 
 /* ================= ADMIN ROUTES ================= */
 
 app.use("/api/admin/refresh", adminRefreshRoutes);
-
 app.use("/api/admin/logs", adminAuth("admin"), adminLogRoutes);
 app.use("/api/admin/dashboard", adminAuth("admin"), adminDashboardRoutes);
+
+/* 🔥 NEW ANALYTICS ROUTE */
+app.use("/api/admin/analytics", adminAuth("admin"), adminAnalyticsRoutes);
+
 app.use("/api/admin/products", adminAuth("editor"), adminProductRoutes);
 app.use("/api/admin/orders", adminAuth("support"), adminOrderRoutes);
 app.use("/api/admin/wallet", adminAuth("finance"), adminWalletRoutes);
@@ -220,10 +213,6 @@ app.use("/api/admin/team", adminAuth("owner"), adminTeamRoutes);
 app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email and password required" });
-        }
 
         const admin = await Admin.findOne({
             email: email.toLowerCase(),
@@ -261,24 +250,22 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
                 role: admin.role,
             },
         });
-    } catch (err) {
-        console.error("Admin login error:", err);
+
+    } catch {
         res.status(500).json({ error: "Login failed" });
     }
 });
 
-/* ================= 404 HANDLER ================= */
+/* ================= 404 ================= */
 
 app.use((req, res) => {
-    res.status(404).json({
-        error: "Route not found",
-    });
+    res.status(404).json({ error: "Route not found" });
 });
 
-/* ================= GLOBAL ERROR HANDLER ================= */
+/* ================= GLOBAL ERROR ================= */
 
 app.use((err, _req, res, _next) => {
-    console.error(err.stack);
+    console.error("Global error:", err.message);
 
     res.status(500).json({
         error:
@@ -288,7 +275,7 @@ app.use((err, _req, res, _next) => {
     });
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 
 const PORT = process.env.PORT || 4242;
 

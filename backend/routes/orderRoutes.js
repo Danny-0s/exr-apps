@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import Order from "../models/Order.js";
+import Order from "../models/OrderTemp.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
@@ -14,9 +14,10 @@ const router = express.Router();
 =================================================== */
 router.post("/", userAuth, async (req, res) => {
     const session = await mongoose.startSession();
-    session.startTransaction();
 
     try {
+        session.startTransaction();
+
         const { items, shipping, paymentMethod = "cod", coupon = null } =
             req.body;
 
@@ -29,13 +30,12 @@ router.post("/", userAuth, async (req, res) => {
         }
 
         const settings = await Settings.getSingleton();
+
         if (settings.maintenanceMode) {
             throw new Error("Store under maintenance");
         }
 
-        /* ===============================
-           STOCK + PRICE SNAPSHOT
-        ================================ */
+        /* ================= STOCK CHECK ================= */
         let subtotal = 0;
         const orderItems = [];
 
@@ -51,7 +51,7 @@ router.post("/", userAuth, async (req, res) => {
                     isActive: true,
                 },
                 { $inc: { stock: -item.quantity } },
-                { new: true, session }
+                { returnDocument: "after", session }
             );
 
             if (!product) {
@@ -69,9 +69,7 @@ router.post("/", userAuth, async (req, res) => {
             });
         }
 
-        /* ===============================
-           COUPON
-        ================================ */
+        /* ================= COUPON ================= */
         let appliedCoupon = null;
         let discountAmount = 0;
 
@@ -117,9 +115,7 @@ router.post("/", userAuth, async (req, res) => {
 
         const finalTotal = subtotal - discountAmount;
 
-        /* ===============================
-           WALLET PAYMENT
-        ================================ */
+        /* ================= WALLET ================= */
         let paymentStatus = "pending";
         let orderStatus = "pending";
 
@@ -132,49 +128,55 @@ router.post("/", userAuth, async (req, res) => {
                 throw new Error("Insufficient wallet balance");
             }
 
-            user.debitWallet(finalTotal, null, "Order payment");
+            user.walletBalance -= finalTotal;
+
+            user.walletTransactions.push({
+                type: "purchase",
+                amount: finalTotal,
+                note: "Order payment",
+                createdAt: new Date(),
+            });
+
             await user.save({ session });
 
             paymentStatus = "paid";
             orderStatus = "paid";
         }
 
-        /* ===============================
-           CREATE ORDER
-        ================================ */
-        const [order] = await Order.create(
-            [
-                {
-                    user: req.user.userId,
-                    items: orderItems,
-                    shipping,
-                    totalAmount: finalTotal,
-                    paymentMethod,
-                    paymentStatus,
-                    orderStatus,
-                    coupon: appliedCoupon,
-                },
-            ],
-            { session }
-        );
+        /* ================= CREATE ORDER ================= */
+        const order = new Order({
+            user: req.user.userId,
+            items: orderItems,
+            shipping,
+            totalAmount: finalTotal,
+            paymentMethod,
+            paymentStatus,
+            orderStatus,
+            coupon: appliedCoupon,
+
+            // IMPORTANT DEFAULTS
+            refundStatus: "none",
+            refundRequested: false,
+            refundTimeline: [],
+        });
+
+        await order.save({ session });
 
         await session.commitTransaction();
-        session.endSession();
 
-        return res.status(201).json({
+        res.status(201).json({
             success: true,
             orderId: order._id,
         });
 
     } catch (err) {
         await session.abortTransaction();
-        session.endSession();
-
         console.error("CREATE ORDER ERROR:", err);
-
-        return res.status(400).json({
+        res.status(400).json({
             error: err.message || "Order failed",
         });
+    } finally {
+        session.endSession();
     }
 });
 
@@ -188,7 +190,7 @@ router.get("/my-orders", userAuth, async (req, res) => {
         }).sort({ createdAt: -1 });
 
         res.json({ success: true, orders });
-    } catch (err) {
+    } catch {
         res.status(500).json({ error: "Failed to fetch orders" });
     }
 });
@@ -212,14 +214,13 @@ router.get("/:id", userAuth, async (req, res) => {
         }
 
         res.json(order);
-
-    } catch (err) {
+    } catch {
         res.status(500).json({ error: "Failed to load order" });
     }
 });
 
 /* ===================================================
-   REQUEST REFUND (SAFE VERSION)
+   REQUEST REFUND (FINAL FIXED)
 =================================================== */
 router.post("/:id/refund-request", userAuth, async (req, res) => {
     try {
@@ -238,13 +239,14 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             return res.status(404).json({ error: "Order not found" });
         }
 
-        /* ===============================
-           SECURITY CHECKS
-        ================================ */
+        const isEligibleForRefund =
+            order.paymentStatus === "paid" ||
+            (order.paymentMethod === "cod" &&
+                order.orderStatus === "delivered");
 
-        if (order.paymentStatus !== "paid") {
+        if (!isEligibleForRefund) {
             return res.status(400).json({
-                error: "Only paid orders can be refunded",
+                error: "Order is not eligible for refund",
             });
         }
 
@@ -254,9 +256,9 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             });
         }
 
-        if (order.refundStatus !== "none") {
+        if (order.refundStatus && order.refundStatus !== "none") {
             return res.status(400).json({
-                error: "Refund already processed/requested",
+                error: "Refund already requested or processed",
             });
         }
 
@@ -273,16 +275,16 @@ router.post("/:id/refund-request", userAuth, async (req, res) => {
             });
         }
 
-        /* ===============================
-           APPLY REFUND REQUEST
-        ================================ */
-
         order.refundRequested = true;
         order.refundRequestedAt = new Date();
         order.refundReason = reason;
         order.refundStatus = "requested";
 
-        order.addRefundTimeline("requested", reason);
+        order.refundTimeline.push({
+            status: "requested",
+            note: reason,
+            createdAt: new Date(),
+        });
 
         await order.save();
 

@@ -5,20 +5,9 @@ import mongoose from "mongoose";
 ===================================================== */
 const refundTimelineSchema = new mongoose.Schema(
     {
-        status: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        note: {
-            type: String,
-            default: "",
-            trim: true,
-        },
-        createdAt: {
-            type: Date,
-            default: Date.now,
-        },
+        status: { type: String, required: true, trim: true },
+        note: { type: String, default: "", trim: true },
+        createdAt: { type: Date, default: Date.now },
     },
     { _id: false }
 );
@@ -28,29 +17,11 @@ const refundTimelineSchema = new mongoose.Schema(
 ===================================================== */
 const orderItemSchema = new mongoose.Schema(
     {
-        _id: {
-            type: String, // Product ID snapshot
-            required: true,
-        },
-        title: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        price: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
-        quantity: {
-            type: Number,
-            required: true,
-            min: 1,
-        },
-        image: {
-            type: String,
-            default: "",
-        },
+        _id: { type: String, required: true },
+        title: { type: String, required: true, trim: true },
+        price: { type: Number, required: true, min: 0 },
+        quantity: { type: Number, required: true, min: 1 },
+        image: { type: String, default: "" },
     },
     { _id: false }
 );
@@ -75,7 +46,6 @@ const shippingSchema = new mongoose.Schema(
 ===================================================== */
 const orderSchema = new mongoose.Schema(
     {
-        /* USER */
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -83,27 +53,26 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ORDER ITEMS */
         items: {
             type: [orderItemSchema],
-            validate: (v) => v.length > 0,
             required: true,
+            validate: {
+                validator: (v) => Array.isArray(v) && v.length > 0,
+                message: "Order must contain at least one item",
+            },
         },
 
-        /* SHIPPING */
         shipping: {
             type: shippingSchema,
             required: true,
         },
 
-        /* TOTAL */
         totalAmount: {
             type: Number,
             required: true,
             min: 0,
         },
 
-        /* PAYMENT METHOD */
         paymentMethod: {
             type: String,
             enum: ["stripe", "cod", "esewa", "khalti", "wallet"],
@@ -111,7 +80,6 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* PAYMENT STATUS */
         paymentStatus: {
             type: String,
             enum: ["pending", "paid", "failed", "refunded"],
@@ -119,7 +87,6 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* ORDER STATUS */
         orderStatus: {
             type: String,
             enum: [
@@ -135,20 +102,9 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        /* STRIPE META */
-        stripeSessionId: {
-            type: String,
-            default: null,
-            index: true,
-        },
+        stripeSessionId: { type: String, default: null },
+        stripePaymentIntentId: { type: String, default: null },
 
-        stripePaymentIntentId: {
-            type: String,
-            default: null,
-            index: true,
-        },
-
-        /* COUPON SNAPSHOT */
         coupon: {
             code: { type: String, trim: true },
             type: { type: String, trim: true },
@@ -156,16 +112,8 @@ const orderSchema = new mongoose.Schema(
             discount: { type: Number, min: 0 },
         },
 
-        /* REFUND FLAGS */
-        refundRequested: {
-            type: Boolean,
-            default: false,
-        },
-
-        refundRequestedAt: {
-            type: Date,
-            default: null,
-        },
+        refundRequested: { type: Boolean, default: false },
+        refundRequestedAt: { type: Date, default: null },
 
         refundReason: {
             type: String,
@@ -186,11 +134,7 @@ const orderSchema = new mongoose.Schema(
             index: true,
         },
 
-        refundRejectReason: {
-            type: String,
-            default: null,
-            trim: true,
-        },
+        refundRejectReason: { type: String, default: null, trim: true },
 
         refundMethod: {
             type: String,
@@ -198,16 +142,8 @@ const orderSchema = new mongoose.Schema(
             default: null,
         },
 
-        refundAmount: {
-            type: Number,
-            min: 0,
-            default: 0,
-        },
-
-        refundedAt: {
-            type: Date,
-            default: null,
-        },
+        refundAmount: { type: Number, default: 0, min: 0 },
+        refundedAt: { type: Date, default: null },
 
         refundedBy: {
             type: mongoose.Schema.Types.ObjectId,
@@ -215,18 +151,13 @@ const orderSchema = new mongoose.Schema(
             default: null,
         },
 
-        /* REFUND TIMELINE */
         refundTimeline: {
             type: [refundTimelineSchema],
             default: [],
         },
 
-        /* ANALYTICS */
         analytics: {
-            refundProcessed: {
-                type: Boolean,
-                default: false,
-            },
+            refundProcessed: { type: Boolean, default: false },
         },
     },
     {
@@ -265,17 +196,7 @@ orderSchema.methods.markAsRefunded = function (adminId, amount, method) {
 };
 
 /* =====================================================
-   PRE-SAVE VALIDATION
-===================================================== */
-orderSchema.pre("save", function (next) {
-    if (this.refundAmount > this.totalAmount) {
-        return next(new Error("Refund amount cannot exceed total amount"));
-    }
-    next();
-});
-
-/* =====================================================
-   SAFE EXPORT (Prevents OverwriteModelError)
+   EXPORT MODEL
 ===================================================== */
 const Order =
     mongoose.models.Order || mongoose.model("Order", orderSchema);

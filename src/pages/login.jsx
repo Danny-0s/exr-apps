@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authcontext";
 import { GoogleLogin } from "@react-oauth/google";
 import API_BASE_URL from "../utils/api";
 

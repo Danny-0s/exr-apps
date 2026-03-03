@@ -1,12 +1,15 @@
 /* ==============================
    IMPORTS (MUST BE FIRST)
 ================================ */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap");
+
+/* Add luxury serif + keep Inter */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /* ==============================
    GLOBAL RESET & TYPOGRAPHY
 ================================ */
+
 * {
     box-sizing: border-box;
 }
@@ -19,18 +22,37 @@ body {
     margin: 0;
     background-color: #000;
     color: #fff;
+
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", Roboto, sans-serif;
+
     font-weight: 400;
     letter-spacing: 0.015em;
     line-height: 1.6;
+
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
 /* ==============================
+   LUXURY HEADINGS
+================================ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.exr-title {
+    font-family: "Playfair Display", serif;
+    letter-spacing: 0.02em;
+}
+
+/* ==============================
    LINKS & BUTTON BASE
 ================================ */
+
 a {
     color: inherit;
     text-decoration: none;
@@ -42,28 +64,9 @@ button {
 }
 
 /* ==============================
-   LUXURY RED UNDERLINE
+   DROPDOWN ANIMATION
 ================================ */
-.logo-luxury-line {
-    height: 2px;
-    background: linear-gradient(90deg,
-            rgba(239, 68, 68, 0) 0%,
-            rgba(239, 68, 68, 0.9) 40%,
-            rgba(239, 68, 68, 1) 50%,
-            rgba(239, 68, 68, 0.9) 60%,
-            rgba(239, 68, 68, 0) 100%);
-    box-shadow:
-        0 0 8px rgba(239, 68, 68, 0.8),
-        0 0 20px rgba(239, 68, 68, 0.6),
-        0 0 40px rgba(239, 68, 68, 0.4);
-    filter: blur(0.4px);
-    transition: transform 0.5s ease-out;
-    transform-origin: left;
-}
 
-/* ==============================
-   DROPDOWN ANIMATION (PREMIUM)
-================================ */
 @keyframes dropdownFade {
     0% {
         opacity: 0;
@@ -128,58 +131,234 @@ button {
 }
 
 /* ===================================
-   FLOATING RED GLOW SYSTEM (NEW)
+   STRAIGHT RED LINE SYSTEM (IMAGE 2)
 =================================== */
 
-/* Smooth floating animation */
-@keyframes exrFloatGlow {
-    0% {
-        transform: translate3d(0px, 0px, 0px);
-    }
-
-    50% {
-        transform: translate3d(40px, -40px, 0px);
-    }
-
-    100% {
-        transform: translate3d(0px, 0px, 0px);
-    }
+.exr-logo-wrapper {
+    position: relative;
+    display: inline-block;
 }
 
-@keyframes exrFloatGlowReverse {
-    0% {
-        transform: translate3d(0px, 0px, 0px);
-    }
-
-    50% {
-        transform: translate3d(-40px, 40px, 0px);
-    }
-
-    100% {
-        transform: translate3d(0px, 0px, 0px);
-    }
-}
-
-/* Glow Base Style */
-.exr-red-glow {
+.exr-logo-line {
     position: absolute;
-    width: 450px;
-    height: 450px;
-    background: radial-gradient(circle,
-            rgba(239, 68, 68, 0.45) 0%,
-            rgba(239, 68, 68, 0.25) 35%,
-            rgba(239, 68, 68, 0.1) 60%,
-            rgba(239, 68, 68, 0) 75%);
-    filter: blur(120px);
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%);
+    width: 0%;
+    height: 2px;
+
+    background: linear-gradient(90deg,
+            rgba(239, 68, 68, 0) 0%,
+            rgba(239, 68, 68, 1) 50%,
+            rgba(239, 68, 68, 0) 100%);
+
+    box-shadow:
+        0 0 8px rgba(239, 68, 68, 0.8),
+        0 0 20px rgba(239, 68, 68, 0.6);
+
+    transition: width 0.35s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+/* Hover expand (desktop) */
+.exr-logo-wrapper:hover .exr-logo-line {
+    width: 120%;
+    opacity: 1;
+}
+
+/* Click flash (desktop + mobile tap) */
+.exr-logo-wrapper:active .exr-logo-line {
+    width: 130%;
+    opacity: 1;
+
+    box-shadow:
+        0 0 12px rgba(239, 68, 68, 1),
+        0 0 30px rgba(239, 68, 68, 0.9),
+        0 0 50px rgba(239, 68, 68, 0.8);
+}
+
+/* Mobile touch support */
+@media (hover: none) {
+    .exr-logo-wrapper:active .exr-logo-line {
+        width: 130%;
+        opacity: 1;
+    }
+}
+
+/* ===================================
+   ULTRA LUXURY LASER LINE SYSTEM
+=================================== */
+
+.exr-laser-wrapper {
+    position: relative;
+    display: inline-block;
+    overflow: visible;
+}
+
+/* Main ultra thin laser */
+.exr-laser-line {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%);
+    width: 120%;
+    height: 1px;
+    /* Ultra thin Dior style */
+
+    background: linear-gradient(90deg,
+            rgba(239, 68, 68, 0) 0%,
+            rgba(239, 68, 68, 1) 50%,
+            rgba(239, 68, 68, 0) 100%);
+
+    opacity: 0.9;
     pointer-events: none;
-    will-change: transform;
+
+    box-shadow:
+        0 0 6px rgba(239, 68, 68, 0.8),
+        0 0 14px rgba(239, 68, 68, 0.6);
+
+    transition: transform 0.1s linear;
 }
 
-/* Animation Variants */
-.exr-glow-animate {
-    animation: exrFloatGlow 14s ease-in-out infinite;
+/* Metallic reflection */
+.exr-laser-reflection {
+    position: absolute;
+    left: 50%;
+    bottom: -10px;
+    transform: translateX(-50%);
+    width: 120%;
+    height: 8px;
+
+    background: radial-gradient(ellipse at center,
+            rgba(239, 68, 68, 0.25) 0%,
+            rgba(239, 68, 68, 0.15) 40%,
+            rgba(239, 68, 68, 0) 80%);
+
+    filter: blur(6px);
+    opacity: 0.6;
+    pointer-events: none;
 }
 
-.exr-glow-animate-reverse {
-    animation: exrFloatGlowReverse 18s ease-in-out infinite;
+/* Cinematic sweep */
+@keyframes exrLaserSweep {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.exr-laser-line {
+    background-size: 200% 100%;
+    animation: exrLaserSweep 6s linear infinite;
+}
+
+/* Click flash */
+.exr-laser-wrapper:active .exr-laser-line {
+    box-shadow:
+        0 0 10px rgba(239, 68, 68, 1),
+        0 0 25px rgba(239, 68, 68, 0.9),
+        0 0 40px rgba(239, 68, 68, 0.8);
+}
+
+/* Mobile support */
+@media (hover: none) {
+    .exr-laser-wrapper:active .exr-laser-line {
+        box-shadow:
+            0 0 10px rgba(239, 68, 68, 1),
+            0 0 25px rgba(239, 68, 68, 0.9);
+    }
+}
+
+/* ===================================
+   EXR ELITE LASER SYSTEM
+=================================== */
+
+.exr-laser-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* Base laser line */
+.exr-laser-line {
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%);
+    width: 120%;
+    height: 1px;
+    background: red;
+    pointer-events: none;
+    transition: all 0.2s ease;
+}
+
+/* Split lines */
+.exr-laser-left,
+.exr-laser-right {
+    position: absolute;
+    bottom: -6px;
+    height: 1px;
+    width: 60%;
+    background: linear-gradient(90deg,
+            rgba(239, 68, 68, 0),
+            rgba(239, 68, 68, 1));
+    transition: transform 0.3s ease;
+}
+
+.exr-laser-left {
+    left: 50%;
+    transform-origin: right;
+    transform: translateX(-100%) scaleX(0);
+}
+
+.exr-laser-right {
+    left: 50%;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+
+/* Hover split */
+.exr-laser-wrapper:hover .exr-laser-left {
+    transform: translateX(-100%) scaleX(1);
+}
+
+.exr-laser-wrapper:hover .exr-laser-right {
+    transform: scaleX(1);
+}
+
+/* Sparks */
+.exr-spark {
+    position: absolute;
+    bottom: -8px;
+    width: 3px;
+    height: 3px;
+    background: red;
+    border-radius: 50%;
+    opacity: 0;
+    animation: exrSpark 0.6s linear infinite;
+}
+
+@keyframes exrSpark {
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(20px);
+        opacity: 0;
+    }
+}
+
+/* Letter glow when active */
+.exr-glow-text {
+    transition: text-shadow 0.3s ease;
+}
+
+.exr-laser-wrapper:hover .exr-glow-text {
+    text-shadow:
+        0 0 6px rgba(239, 68, 68, 0.8),
+        0 0 16px rgba(239, 68, 68, 0.6);
 }

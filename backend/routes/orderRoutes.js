@@ -1,16 +1,73 @@
 import express from "express";
 import mongoose from "mongoose";
+import Stripe from "stripe";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Coupon from "../models/Coupon.js";
 import Settings from "../models/Settings.js";
 import User from "../models/User.js";
+import Store from "../models/Store.js";
 import { userAuth } from "../middleware/userAuth.js";
 
 const router = express.Router();
 
+/* =========================================
+   SAFE STRIPE INITIALIZATION
+========================================= */
+let stripe = null;
+
+if (process.env.STRIPE_SECRET_KEY) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+    console.log("⚠️ Stripe not initialized (missing STRIPE_SECRET_KEY)");
+}
+
 /* ===================================================
-   CREATE ORDER
+   GET USER ORDERS
+=================================================== */
+router.get("/my-orders", userAuth, async (req, res) => {
+    try {
+        const orders = await Order.find({
+            user: req.user.userId,
+        })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        res.json({
+            success: true,
+            orders,
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch orders" });
+    }
+});
+
+/* ===================================================
+   GET SINGLE ORDER
+=================================================== */
+router.get("/:id", userAuth, async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: "Invalid order ID" });
+        }
+
+        const order = await Order.findOne({
+            _id: req.params.id,
+            user: req.user.userId,
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+
+        res.json(order);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch order" });
+    }
+});
+
+/* ===================================================
+   CREATE ORDER (YOUR ORIGINAL LOGIC)
 =================================================== */
 router.post("/", userAuth, async (req, res) => {
     const session = await mongoose.startSession();
@@ -18,8 +75,18 @@ router.post("/", userAuth, async (req, res) => {
     try {
         session.startTransaction();
 
-        const { items, shipping, paymentMethod = "cod", coupon = null } =
-            req.body;
+        const user = await User.findById(req.user.userId).session(session);
+        if (!user) throw new Error("User not found");
+
+        const {
+            items,
+            shipping,
+            paymentMethod = "cod",
+            coupon = null,
+        } = req.body;
+
+        const resolvedStore = await Store.findOne({ isActive: true }).session(session);
+        if (!resolvedStore) throw new Error("No active store available");
 
         if (!Array.isArray(items) || items.length === 0) {
             throw new Error("Invalid items");
@@ -30,12 +97,10 @@ router.post("/", userAuth, async (req, res) => {
         }
 
         const settings = await Settings.getSingleton();
-
         if (settings.maintenanceMode) {
             throw new Error("Store under maintenance");
         }
 
-        /* ================= STOCK CHECK ================= */
         let subtotal = 0;
         const orderItems = [];
 
@@ -69,31 +134,16 @@ router.post("/", userAuth, async (req, res) => {
             });
         }
 
-        /* ================= COUPON ================= */
         let appliedCoupon = null;
         let discountAmount = 0;
 
-        if (coupon?.code) {
+        if (coupon?.code) { 
             const couponDoc = await Coupon.findOne({
                 code: coupon.code.toUpperCase().trim(),
                 active: true,
             }).session(session);
 
             if (!couponDoc) throw new Error("Invalid coupon");
-
-            if (
-                couponDoc.expiresAt &&
-                new Date(couponDoc.expiresAt) < new Date()
-            ) {
-                throw new Error("Coupon expired");
-            }
-
-            if (
-                couponDoc.maxUses !== null &&
-                couponDoc.usedCount >= couponDoc.maxUses
-            ) {
-                throw new Error("Coupon limit reached");
-            }
 
             discountAmount =
                 couponDoc.type === "percent"
@@ -115,13 +165,29 @@ router.post("/", userAuth, async (req, res) => {
 
         const finalTotal = subtotal - discountAmount;
 
-        /* ================= WALLET ================= */
+        /* =========================================
+   WELCOME 20% DISCOUNT (FIRST ORDER ONLY)
+========================================= */
+
+        if (!user.welcomeDiscountUsed) {
+            const welcomeDiscount = Math.round(subtotal * 0.2);
+
+            discountAmount += welcomeDiscount;
+
+            appliedCoupon = {
+                ...(appliedCoupon || {}),
+                welcomeDiscount: welcomeDiscount,
+            };
+
+            user.welcomeDiscountUsed = true;
+            await user.save({ session });
+        }
+
         let paymentStatus = "pending";
         let orderStatus = "pending";
 
         if (paymentMethod === "wallet") {
             const user = await User.findById(req.user.userId).session(session);
-
             if (!user) throw new Error("User not found");
 
             if (user.walletBalance < finalTotal) {
@@ -143,8 +209,8 @@ router.post("/", userAuth, async (req, res) => {
             orderStatus = "paid";
         }
 
-        /* ================= CREATE ORDER ================= */
         const order = new Order({
+            store: resolvedStore._id,
             user: req.user.userId,
             items: orderItems,
             shipping,
@@ -153,15 +219,9 @@ router.post("/", userAuth, async (req, res) => {
             paymentStatus,
             orderStatus,
             coupon: appliedCoupon,
-
-            // IMPORTANT DEFAULTS
-            refundStatus: "none",
-            refundRequested: false,
-            refundTimeline: [],
         });
 
         await order.save({ session });
-
         await session.commitTransaction();
 
         res.status(201).json({
@@ -171,133 +231,9 @@ router.post("/", userAuth, async (req, res) => {
 
     } catch (err) {
         await session.abortTransaction();
-        console.error("CREATE ORDER ERROR:", err);
-        res.status(400).json({
-            error: err.message || "Order failed",
-        });
+        res.status(400).json({ error: err.message });
     } finally {
         session.endSession();
-    }
-});
-
-/* ===================================================
-   GET MY ORDERS
-=================================================== */
-router.get("/my-orders", userAuth, async (req, res) => {
-    try {
-        const orders = await Order.find({
-            user: req.user.userId,
-        }).sort({ createdAt: -1 });
-
-        res.json({ success: true, orders });
-    } catch {
-        res.status(500).json({ error: "Failed to fetch orders" });
-    }
-});
-
-/* ===================================================
-   GET SINGLE ORDER
-=================================================== */
-router.get("/:id", userAuth, async (req, res) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "Invalid order ID" });
-        }
-
-        const order = await Order.findOne({
-            _id: req.params.id,
-            user: req.user.userId,
-        });
-
-        if (!order) {
-            return res.status(404).json({ error: "Order not found" });
-        }
-
-        res.json(order);
-    } catch {
-        res.status(500).json({ error: "Failed to load order" });
-    }
-});
-
-/* ===================================================
-   REQUEST REFUND (FINAL FIXED)
-=================================================== */
-router.post("/:id/refund-request", userAuth, async (req, res) => {
-    try {
-        const { reason } = req.body;
-
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "Invalid order ID" });
-        }
-
-        const order = await Order.findOne({
-            _id: req.params.id,
-            user: req.user.userId,
-        });
-
-        if (!order) {
-            return res.status(404).json({ error: "Order not found" });
-        }
-
-        const isEligibleForRefund =
-            order.paymentStatus === "paid" ||
-            (order.paymentMethod === "cod" &&
-                order.orderStatus === "delivered");
-
-        if (!isEligibleForRefund) {
-            return res.status(400).json({
-                error: "Order is not eligible for refund",
-            });
-        }
-
-        if (order.orderStatus !== "delivered") {
-            return res.status(400).json({
-                error: "Refund allowed only after delivery",
-            });
-        }
-
-        if (order.refundStatus && order.refundStatus !== "none") {
-            return res.status(400).json({
-                error: "Refund already requested or processed",
-            });
-        }
-
-        const allowedReasons = [
-            "size_issue",
-            "damaged_item",
-            "wrong_item",
-            "change_of_mind",
-        ];
-
-        if (!allowedReasons.includes(reason)) {
-            return res.status(400).json({
-                error: "Invalid refund reason",
-            });
-        }
-
-        order.refundRequested = true;
-        order.refundRequestedAt = new Date();
-        order.refundReason = reason;
-        order.refundStatus = "requested";
-
-        order.refundTimeline.push({
-            status: "requested",
-            note: reason,
-            createdAt: new Date(),
-        });
-
-        await order.save();
-
-        res.json({
-            success: true,
-            message: "Refund request submitted",
-        });
-
-    } catch (err) {
-        console.error("REFUND REQUEST ERROR:", err);
-        res.status(500).json({
-            error: "Failed to submit refund request",
-        });
     }
 });
 

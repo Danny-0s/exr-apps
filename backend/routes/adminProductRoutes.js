@@ -5,35 +5,33 @@ import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-/* ===============================
+/* =====================================================
    GET ALL PRODUCTS (ADMIN)
-================================ */
-router.get("/", adminAuth, async (_req, res) => {
+===================================================== */
+router.get("/", adminAuth("editor"), async (_req, res) => {
     try {
-        const products = await Product.find().sort({
-            createdAt: -1,
-        });
-
-        res.json(products);
+        const products = await Product.find().sort({ createdAt: -1 });
+        return res.json(products);
     } catch (err) {
         console.error("ADMIN FETCH PRODUCTS ERROR:", err);
-        res.status(500).json({
-            message: "Failed to fetch products",
+        return res.status(500).json({
+            error: "Failed to fetch products",
         });
     }
 });
 
-/* ===============================
+/* =====================================================
    CREATE PRODUCT (ADMIN)
-================================ */
+===================================================== */
 router.post(
     "/",
-    adminAuth,
+    adminAuth("editor"),
     (req, res, next) => {
         upload.array("images", 6)(req, res, err => {
             if (err) {
+                console.error("UPLOAD ERROR:", err);
                 return res.status(400).json({
-                    message: err.message || "Image upload failed",
+                    error: err.message || "Image upload failed",
                 });
             }
             next();
@@ -50,32 +48,44 @@ router.post(
                 sizes,
             } = req.body;
 
-            /* ===== VALIDATION ===== */
+            /* ================= VALIDATION ================= */
+
             if (!title || !category || !price || stock === undefined) {
                 return res.status(400).json({
-                    message:
-                        "Title, category, price, and stock are required",
+                    error: "Title, category, price and stock are required",
                 });
             }
 
             if (!req.files || req.files.length === 0) {
                 return res.status(400).json({
-                    message: "At least one image is required",
+                    error: "At least one image is required",
                 });
             }
 
             let parsedSizes = [];
-            try {
-                parsedSizes = sizes ? JSON.parse(sizes) : [];
-            } catch {
-                return res.status(400).json({
-                    message: "Invalid sizes format",
-                });
+
+            if (sizes) {
+                try {
+                    parsedSizes = JSON.parse(sizes);
+                    if (!Array.isArray(parsedSizes)) {
+                        return res.status(400).json({
+                            error: "Sizes must be an array",
+                        });
+                    }
+                } catch {
+                    return res.status(400).json({
+                        error: "Invalid sizes format",
+                    });
+                }
             }
+
+            /* ================= BUILD IMAGE PATHS ================= */
 
             const images = req.files.map(
                 file => `/uploads/${file.filename}`
             );
+
+            /* ================= CREATE PRODUCT ================= */
 
             const product = await Product.create({
                 title: title.trim(),
@@ -89,26 +99,27 @@ router.post(
                 isActive: true,
             });
 
-            res.status(201).json(product);
+            return res.status(201).json(product);
+
         } catch (err) {
             console.error("ADMIN CREATE PRODUCT ERROR:", err);
-            res.status(500).json({
-                message: "Failed to create product",
+            return res.status(500).json({
+                error: "Failed to create product",
             });
         }
     }
 );
 
-/* ===============================
+/* =====================================================
    UPDATE STOCK (ADMIN)
-================================ */
-router.patch("/:id/stock", adminAuth, async (req, res) => {
+===================================================== */
+router.patch("/:id/stock", adminAuth("editor"), async (req, res) => {
     try {
         const { stock } = req.body;
 
-        if (stock === undefined || stock < 0) {
+        if (stock === undefined || Number(stock) < 0) {
             return res.status(400).json({
-                message: "Invalid stock value",
+                error: "Invalid stock value",
             });
         }
 
@@ -116,42 +127,42 @@ router.patch("/:id/stock", adminAuth, async (req, res) => {
 
         if (!product) {
             return res.status(404).json({
-                message: "Product not found",
+                error: "Product not found",
             });
         }
 
         product.stock = Number(stock);
-        await product.save(); // 🔥 triggers waitlist auto-clear
+        await product.save();
 
-        res.json(product);
+        return res.json(product);
+
     } catch (err) {
         console.error("UPDATE STOCK ERROR:", err);
-        res.status(500).json({
-            message: "Failed to update stock",
+        return res.status(500).json({
+            error: "Failed to update stock",
         });
     }
 });
 
-/* ===============================
+/* =====================================================
    DELETE PRODUCT (ADMIN)
-================================ */
-router.delete("/:id", adminAuth, async (req, res) => {
+===================================================== */
+router.delete("/:id", adminAuth("editor"), async (req, res) => {
     try {
-        const product = await Product.findByIdAndDelete(
-            req.params.id
-        );
+        const product = await Product.findByIdAndDelete(req.params.id);
 
         if (!product) {
             return res.status(404).json({
-                message: "Product not found",
+                error: "Product not found",
             });
         }
 
-        res.json({ success: true });
+        return res.json({ success: true });
+
     } catch (err) {
         console.error("DELETE PRODUCT ERROR:", err);
-        res.status(500).json({
-            message: "Failed to delete product",
+        return res.status(500).json({
+            error: "Failed to delete product",
         });
     }
 });

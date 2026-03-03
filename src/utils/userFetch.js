@@ -1,16 +1,44 @@
-const API_BASE = "http://localhost:4242";
+/* ===============================
+   API BASE (AUTO SWITCH DEV/PROD)
+================================ */
+const API_BASE =
+    import.meta.env.PROD
+        ? "https://exr-apps-1-backend.onrender.com"
+        : "http://localhost:4242";
 
-export async function userFetch(url, options = {}) {
+/* ===============================
+   USER FETCH WRAPPER (FIXED)
+================================ */
+export async function userFetch(endpoint, options = {}) {
+
     const token = localStorage.getItem("token");
 
-    const res = await fetch(`${API_BASE}${url}`, {
+    const headers = {
+        ...(options.headers || {}),
+    };
+
+    if (!(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    const config = {
         ...options,
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            ...options.headers,
-        },
-    });
+        headers,
+    };
+
+    if (
+        config.body &&
+        typeof config.body === "object" &&
+        !(config.body instanceof FormData)
+    ) {
+        config.body = JSON.stringify(config.body);
+    }
+
+    const res = await fetch(`${API_BASE}${endpoint}`, config);
 
     /* ===============================
        AUTO LOGOUT IF TOKEN EXPIRED
@@ -18,10 +46,15 @@ export async function userFetch(url, options = {}) {
     if (res.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-
-        window.location.href = "/login";
+        window.location.replace("/login");
         return;
     }
 
-    return res;
+    const data = await res.json(); // 🔥 THIS WAS MISSING
+
+    if (!res.ok) {
+        throw new Error(data.error || "Request failed");
+    }
+
+    return data; // 🔥 RETURN PARSED JSON
 }

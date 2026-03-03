@@ -24,14 +24,27 @@ export default function Success() {
                 return;
             }
 
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                setError("Please login to view order");
+                setLoading(false);
+                return;
+            }
+
             try {
-                // Verify Khalti only if needed
+                /* ===============================
+                   Verify Khalti if needed
+                ================================ */
                 if (payment === "khalti" && pidx) {
                     const verifyRes = await fetch(
                         `${API_BASE_URL}/api/payments/khalti/verify`,
                         {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                            },
                             body: JSON.stringify({ pidx }),
                         }
                     );
@@ -41,9 +54,16 @@ export default function Success() {
                     }
                 }
 
-                // Load order after verification
+                /* ===============================
+                   Fetch Order (WITH TOKEN)
+                ================================ */
                 const res = await fetch(
-                    `${API_BASE_URL}/api/orders/${orderId}`
+                    `${API_BASE_URL}/api/orders/${orderId}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
                 );
 
                 if (!res.ok) {
@@ -53,7 +73,6 @@ export default function Success() {
                 const data = await res.json();
                 setOrder(data);
 
-                // Clear cart only after success
                 clearCart();
             } catch (err) {
                 console.error(err);
@@ -95,10 +114,7 @@ export default function Success() {
         0
     );
 
-    const shippingFee = Math.max(
-        0,
-        order.totalAmount - subtotal
-    );
+    const shippingFee = Math.max(0, order.totalAmount - subtotal);
 
     return (
         <div className="min-h-screen bg-black text-white px-6 py-16 flex justify-center">
@@ -120,8 +136,7 @@ export default function Success() {
                     <p>{order.shipping.fullName}</p>
                     <p>{order.shipping.phone}</p>
                     <p>
-                        {order.shipping.address},{" "}
-                        {order.shipping.city},{" "}
+                        {order.shipping.address}, {order.shipping.city},{" "}
                         {order.shipping.province}
                     </p>
                     {order.shipping.notes && (
@@ -150,16 +165,8 @@ export default function Success() {
 
                     <div className="flex justify-between text-lg border-t border-zinc-800 pt-3">
                         <span>TOTAL</span>
-                        <span>
-                            {formatNPR(order.totalAmount)}
-                        </span>
+                        <span>{formatNPR(order.totalAmount)}</span>
                     </div>
-
-                    {subtotal >= 10000 && (
-                        <p className="text-green-500 text-xs">
-                            🎉 Free shipping applied
-                        </p>
-                    )}
                 </div>
 
                 <div className="flex justify-center gap-4 pt-4">

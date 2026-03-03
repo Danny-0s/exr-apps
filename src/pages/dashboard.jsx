@@ -16,43 +16,31 @@ export default function UserDashboard() {
         loadDashboard();
     }, []);
 
-    /* ===============================
-       LOAD DASHBOARD DATA
-    ================================ */
+    /* ================= LOAD DASHBOARD ================= */
     const loadDashboard = async () => {
         try {
+            setLoading(true);
+            setError("");
+
             /* ===== PROFILE ===== */
-            const profileRes = await userFetch("/api/auth/profile");
-            if (!profileRes) return;
-
-            const profileData = await profileRes.json();
-
-            if (!profileRes.ok) {
-                throw new Error(profileData.error || "Failed to load profile");
-            }
-
+            const profileData = await userFetch("/api/auth/profile");
+            if (!profileData) return;
             setUser(profileData);
 
             /* ===== ORDERS ===== */
-            const ordersRes = await userFetch("/api/orders/my-orders");
-            if (ordersRes) {
-                const ordersData = await ordersRes.json();
-                if (ordersRes.ok) {
-                    setOrders(ordersData.orders || []);
-                }
+            const ordersData = await userFetch("/api/orders/my-orders");
+            if (ordersData) {
+                setOrders(ordersData.orders || []);
             }
 
             /* ===== WISHLIST ===== */
-            const wishlistRes = await userFetch("/api/wishlist");
-            if (wishlistRes) {
-                const wishlistData = await wishlistRes.json();
-                if (wishlistRes.ok) {
-                    setWishlistCount(wishlistData.items?.length || 0);
-                }
+            const wishlistData = await userFetch("/api/wishlist");
+            if (wishlistData) {
+                setWishlistCount(wishlistData.items?.length || 0);
             }
 
         } catch (err) {
-            setError(err.message);
+            setError(err.message || "Failed to load dashboard");
         } finally {
             setLoading(false);
         }
@@ -63,9 +51,6 @@ export default function UserDashboard() {
         navigate("/login");
     };
 
-    /* ===============================
-       LOADING STATE
-    ================================ */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -76,9 +61,6 @@ export default function UserDashboard() {
         );
     }
 
-    /* ===============================
-       ERROR STATE
-    ================================ */
     if (error) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -87,13 +69,9 @@ export default function UserDashboard() {
         );
     }
 
-    /* ===============================
-       UI
-    ================================ */
     return (
         <div className="min-h-screen bg-black text-white px-6 md:px-16 py-16">
 
-            {/* HEADER */}
             <div className="mb-16">
                 <p className="text-white/50 tracking-widest text-sm">
                     USER DASHBOARD
@@ -103,48 +81,37 @@ export default function UserDashboard() {
                 </h1>
             </div>
 
-            {/* SUMMARY CARDS */}
             <div className="grid md:grid-cols-4 gap-8 mb-16">
-
-                {/* WALLET */}
                 <DashboardCard
                     title="WALLET BALANCE"
                     value={`Rs ${user?.walletBalance?.toLocaleString() || 0}`}
                     color="text-green-400"
                 />
 
-                {/* ORDERS */}
                 <DashboardCard
                     title="TOTAL ORDERS"
                     value={orders.length}
                 />
 
-                {/* WISHLIST */}
                 <DashboardCard
                     title="WISHLIST ITEMS"
                     value={wishlistCount}
                 />
 
-                {/* ACCOUNT STATUS */}
                 <DashboardCard
                     title="ACCOUNT STATUS"
                     value={user?.isActive ? "ACTIVE" : "BLOCKED"}
                     color={user?.isActive ? "text-green-400" : "text-red-500"}
                 />
-
             </div>
 
-            {/* QUICK LINKS */}
             <div className="grid md:grid-cols-4 gap-6 mb-16">
-
                 <DashboardLink to="/orders" label="MY ORDERS" />
                 <DashboardLink to="/wallet" label="MY WALLET" />
                 <DashboardLink to="/coupons" label="MY COUPONS" />
                 <DashboardLink to="/wishlist" label="MY WISHLIST" />
-
             </div>
 
-            {/* RECENT ORDERS */}
             <div className="mb-16">
                 <h2 className="text-xl mb-6 tracking-widest">
                     RECENT ORDERS
@@ -179,7 +146,6 @@ export default function UserDashboard() {
                 )}
             </div>
 
-            {/* LOGOUT */}
             <button
                 onClick={logout}
                 className="border border-red-500 text-red-500 px-6 py-3 tracking-widest hover:bg-red-500 hover:text-black transition"
@@ -190,9 +156,6 @@ export default function UserDashboard() {
     );
 }
 
-/* ===============================
-   COMPONENTS
-================================ */
 function DashboardCard({ title, value, color = "text-white" }) {
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">

@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 /* =========================================
    STRICT USER AUTH (Protected Routes)
@@ -20,7 +21,20 @@ export const userAuth = (req, res, next) => {
             process.env.USER_JWT_SECRET
         );
 
-        req.user = decoded; // { userId }
+        // 🔥 Ensure userId always exists
+        if (!decoded.userId) {
+            return res.status(401).json({
+                error: "Invalid token payload",
+            });
+        }
+
+        // 🔥 Normalize ObjectId safely
+        req.user = {
+            userId: mongoose.Types.ObjectId.isValid(decoded.userId)
+                ? new mongoose.Types.ObjectId(decoded.userId)
+                : decoded.userId,
+        };
+
         next();
     } catch (err) {
         return res.status(401).json({
@@ -42,11 +56,20 @@ export const userAuthOptional = (req, _res, next) => {
 
     try {
         const token = authHeader.split(" ")[1];
+
         const decoded = jwt.verify(
             token,
             process.env.USER_JWT_SECRET
         );
-        req.user = decoded;
+
+        if (decoded.userId && mongoose.Types.ObjectId.isValid(decoded.userId)) {
+            req.user = {
+                userId: new mongoose.Types.ObjectId(decoded.userId),
+            };
+        } else {
+            req.user = null;
+        }
+
     } catch {
         req.user = null;
     }

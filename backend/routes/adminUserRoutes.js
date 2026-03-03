@@ -5,62 +5,45 @@ import adminAuth from "../middleware/adminAuth.js";
 const router = express.Router();
 
 /* ===================================================
-   ROLE POWER SYSTEM
+   GET ALL PUBLIC USERS
 =================================================== */
-const roleLevels = {
-    super_admin: 6,
-    owner: 5,
-    admin: 4,
-    editor: 3,
-    support: 2,
-    finance: 1,
-};
-
-const getRoleLevel = (role) => roleLevels[role] || 0;
-
-/* ===================================================
-   GET ALL USERS
-   Owner and above only
-=================================================== */
-router.get("/", adminAuth("owner"), async (_req, res) => {
+router.get("/", adminAuth("super_admin"), async (_req, res) => {
     try {
-        const users = await User.find()
+        const users = await User.find({
+            role: {
+                $nin: [
+                    "super_admin",
+                    "owner",
+                    "admin",
+                    "editor",
+                    "support",
+                    "finance",
+                ],
+            },
+        })
             .select("-password")
             .sort({ createdAt: -1 });
 
         res.json({
             success: true,
+            count: users.length,
             users,
         });
     } catch (err) {
         console.error("FETCH USERS ERROR:", err);
-        res.status(500).json({
-            error: "Failed to fetch users",
-        });
+        res.status(500).json({ error: "Failed to fetch users" });
     }
 });
 
 /* ===================================================
-   TOGGLE USER ACTIVE / BLOCK
-   Only owner and above
+   BAN / UNBAN USER
 =================================================== */
-router.patch("/:id/toggle", adminAuth("owner"), async (req, res) => {
+router.patch("/:id/ban", adminAuth("super_admin"), async (req, res) => {
     try {
-        const currentAdminLevel = getRoleLevel(req.admin.role);
-
-        // Extra safety (should already be owner+ from middleware)
-        if (currentAdminLevel < roleLevels.owner) {
-            return res.status(403).json({
-                error: "Insufficient permissions",
-            });
-        }
-
         const user = await User.findById(req.params.id);
 
         if (!user) {
-            return res.status(404).json({
-                error: "User not found",
-            });
+            return res.status(404).json({ error: "User not found" });
         }
 
         user.isActive = !user.isActive;
@@ -71,10 +54,61 @@ router.patch("/:id/toggle", adminAuth("owner"), async (req, res) => {
             isActive: user.isActive,
         });
     } catch (err) {
-        console.error("TOGGLE USER ERROR:", err);
-        res.status(500).json({
-            error: "Failed to update user",
+        console.error("BAN USER ERROR:", err);
+        res.status(500).json({ error: "Failed to update user status" });
+    }
+});
+
+/* ===================================================
+   UPDATE WALLET
+=================================================== */
+router.patch("/:id/wallet", adminAuth("super_admin"), async (req, res) => {
+    try {
+        const { amount } = req.body;
+
+        if (typeof amount !== "number") {
+            return res.status(400).json({ error: "Invalid amount" });
+        }
+
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        user.walletBalance = (user.walletBalance || 0) + amount;
+        await user.save();
+
+        res.json({
+            success: true,
+            user,
         });
+    } catch (err) {
+        console.error("UPDATE WALLET ERROR:", err);
+        res.status(500).json({ error: "Failed to update wallet" });
+    }
+});
+
+/* ===================================================
+   DELETE USER
+=================================================== */
+router.delete("/:id", adminAuth("super_admin"), async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        await user.deleteOne();
+
+        res.json({
+            success: true,
+            message: "User deleted",
+        });
+    } catch (err) {
+        console.error("DELETE USER ERROR:", err);
+        res.status(500).json({ error: "Failed to delete user" });
     }
 });
 

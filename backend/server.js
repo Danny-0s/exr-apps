@@ -8,9 +8,10 @@ import Stripe from "stripe";
 import path from "path";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import hpp from "hpp";
+import compression from "compression";
 
 import connectDB from "./config/db.js";
+import { connectRedis } from "./config/redis.js";
 import adminAuth from "./middleware/adminAuth.js";
 
 /* ================= ROUTES ================= */
@@ -36,24 +37,33 @@ import mediaRoutes from "./routes/mediaRoutes.js";
 import adminUserRoutes from "./routes/adminUserRoutes.js";
 import adminTeamRoutes from "./routes/adminTeamRoutes.js";
 import couponPublicRoutes from "./routes/couponPublicRoutes.js";
-
-/* 🔥 NEW ANALYTICS ROUTE */
 import adminAnalyticsRoutes from "./routes/adminAnalyticsRoutes.js";
+import adminStoreRoutes from "./routes/adminStoreRoutes.js";
 
 /* ================= MODELS ================= */
 import Order from "./models/Order.js";
-import Settings from "./models/Settings.js";
 import Admin from "./models/Admin.js";
+import Settings from "./models/Settings.js"; // ✅ FIXED IMPORT
 
 const app = express();
 app.set("trust proxy", 1);
 
+/* ================= DATABASE ================= */
 connectDB();
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+/* ================= REDIS ================= */
+connectRedis();
+
+/* ================= STRIPE ================= */
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+    console.warn("⚠️ Stripe not initialized (missing STRIPE_SECRET_KEY)");
+}
 
 /* =====================================================
-   🔐 GLOBAL SECURITY
+   🔐 SECURITY HARDENING
 ===================================================== */
 
 app.disable("x-powered-by");
@@ -61,61 +71,63 @@ app.disable("x-powered-by");
 app.use(
     helmet({
         crossOriginResourcePolicy: false,
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", "data:", "https:"],
+                connectSrc: ["'self'", "https:"],
+            },
+        },
     })
 );
 
-app.use(hpp());
+app.use(compression());
 
-const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-});
+app.use(
+    rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 300,
+        standardHeaders: true,
+        legacyHeaders: false,
+    })
+);
 
-app.use(globalLimiter);
+/* Force HTTPS in production */
+if (process.env.NODE_ENV === "production") {
+    app.use((req, res, next) => {
+        if (req.headers["x-forwarded-proto"] !== "https") {
+            return res.redirect(`https://${req.headers.host}${req.url}`);
+        }
+        next();
+    });
+}
 
-/* ================= ADMIN LOGIN RATE LIMIT ================= */
-
-const adminLoginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-/* ================= CORS ================= */
-
-const allowedOrigins = [
-    "http://localhost:5173",
-    "https://exr-apps-1.onrender.com",
-];
+/* =====================================================
+   CORS
+===================================================== */
 
 app.use(
     cors({
-        origin: function (origin, callback) {
-            if (!origin) return callback(null, true);
-            if (allowedOrigins.includes(origin)) {
-                callback(null, true);
-            } else {
-                callback(new Error("Not allowed by CORS"));
-            }
-        },
+        origin: ["http://localhost:5173", "https://exr-apps-1.onrender.com"],
         credentials: true,
     })
 );
 
 /* =====================================================
-   STRIPE WEBHOOK (BEFORE JSON PARSER)
+   STRIPE WEBHOOK
 ===================================================== */
 
 app.post(
     "/api/stripe/webhook",
     express.raw({ type: "application/json" }),
     async (req, res) => {
-        const sig = req.headers["stripe-signature"];
+        if (!stripe) return res.status(400).send("Stripe not configured");
 
         try {
+            const sig = req.headers["stripe-signature"];
+
             const event = stripe.webhooks.constructEvent(
                 req.body,
                 sig,
@@ -136,7 +148,6 @@ app.post(
             }
 
             res.json({ received: true });
-
         } catch (err) {
             console.error("Stripe webhook error:", err.message);
             res.status(400).send("Webhook Error");
@@ -144,27 +155,15 @@ app.post(
     }
 );
 
-/* ================= BODY PARSERS ================= */
+/* JSON BODY */
+app.use(express.json({ limit: "10kb" }));
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-/* ================= STATIC FILES ================= */
-
+/* STATIC */
 app.use("/uploads", express.static(path.resolve("uploads")));
 
-/* ================= PUBLIC SETTINGS ================= */
-
-app.get("/api/settings", async (_req, res) => {
-    try {
-        const settings = await Settings.getSingleton();
-        res.json(settings);
-    } catch {
-        res.status(500).json({ error: "Failed to load settings" });
-    }
-});
-
-/* ================= PUBLIC ROUTES ================= */
+/* =====================================================
+   PUBLIC ROUTES
+===================================================== */
 
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
@@ -177,27 +176,49 @@ app.use("/api/auth", authRoutes);
 app.use("/api/payments/khalti", khaltiRoutes);
 app.use("/api/payments/esewa", esewaRoutes);
 
-/* ================= ADMIN VERIFY ================= */
+/* =====================================================
+   PUBLIC STORE SETTINGS (FOR CHECKOUT)
+===================================================== */
 
-app.get("/api/admin/verify", adminAuth("admin"), (req, res) => {
-    res.json({
-        success: true,
-        admin: {
-            id: req.admin._id,
-            role: req.admin.role,
-        },
-    });
+app.get("/api/settings", async (req, res) => {
+    try {
+        const settings = await Settings.getSingleton();
+
+        if (!settings) {
+            return res.json({
+                codEnabled: true,
+                stripeEnabled: false,
+                esewaEnabled: false,
+                khaltiEnabled: false,
+                shippingInsideValley: 150,
+                shippingOutsideValley: 300,
+            });
+        }
+
+        res.json({
+            codEnabled: settings.codEnabled ?? true,
+            stripeEnabled: settings.stripeEnabled ?? false,
+            esewaEnabled: settings.esewaEnabled ?? false,
+            khaltiEnabled: settings.khaltiEnabled ?? false,
+            shippingInsideValley: settings.shippingInsideValley ?? 150,
+            shippingOutsideValley: settings.shippingOutsideValley ?? 300,
+        });
+
+    } catch (err) {
+        console.error("PUBLIC SETTINGS ERROR:", err);
+        res.status(500).json({ error: "Failed to load settings" });
+    }
 });
 
-/* ================= ADMIN ROUTES ================= */
+/* =====================================================
+   ADMIN ROUTES
+===================================================== */
 
 app.use("/api/admin/refresh", adminRefreshRoutes);
 app.use("/api/admin/logs", adminAuth("admin"), adminLogRoutes);
 app.use("/api/admin/dashboard", adminAuth("admin"), adminDashboardRoutes);
-
-/* 🔥 NEW ANALYTICS ROUTE */
 app.use("/api/admin/analytics", adminAuth("admin"), adminAnalyticsRoutes);
-
+app.use("/api/admin/stores", adminAuth("owner"), adminStoreRoutes);
 app.use("/api/admin/products", adminAuth("editor"), adminProductRoutes);
 app.use("/api/admin/orders", adminAuth("support"), adminOrderRoutes);
 app.use("/api/admin/wallet", adminAuth("finance"), adminWalletRoutes);
@@ -205,25 +226,24 @@ app.use("/api/admin/coupons", adminAuth("editor"), adminCouponRoutes);
 app.use("/api/admin/settings", adminAuth("owner"), adminSettingsRoutes);
 app.use("/api/admin/media", adminAuth("editor"), mediaRoutes);
 app.use("/api/admin/upload", adminAuth("editor"), adminUploadRoutes);
-app.use("/api/admin/users", adminAuth("owner"), adminUserRoutes);
+app.use("/api/admin/users", adminAuth("super-admin"), adminUserRoutes);
 app.use("/api/admin/team", adminAuth("owner"), adminTeamRoutes);
 
-/* ================= ADMIN LOGIN ================= */
+/* =====================================================
+   ADMIN LOGIN
+===================================================== */
 
-app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
+app.post("/api/admin/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const admin = await Admin.findOne({
-            email: email.toLowerCase(),
-        });
+        const admin = await Admin.findOne({ email: email.toLowerCase() });
 
         if (!admin || !admin.isActive) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
         const isMatch = await admin.matchPassword(password);
-
         if (!isMatch) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
@@ -250,19 +270,51 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
                 role: admin.role,
             },
         });
-
-    } catch {
+    } catch (err) {
+        console.error("Login error:", err);
         res.status(500).json({ error: "Login failed" });
     }
 });
 
-/* ================= 404 ================= */
+/* =====================================================
+   ADMIN VERIFY
+===================================================== */
+
+app.get("/api/admin/verify", (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith("Bearer ")) {
+            return res.status(401).json({ valid: false });
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        const decoded = jwt.verify(
+            token,
+            process.env.ADMIN_JWT_SECRET
+        );
+
+        res.json({
+            valid: true,
+            adminId: decoded.adminId,
+            role: decoded.role,
+        });
+    } catch {
+        res.status(401).json({ valid: false });
+    }
+});
+
+/* =====================================================
+   404
+===================================================== */
 
 app.use((req, res) => {
     res.status(404).json({ error: "Route not found" });
 });
 
-/* ================= GLOBAL ERROR ================= */
+/* =====================================================
+   GLOBAL ERROR
+===================================================== */
 
 app.use((err, _req, res, _next) => {
     console.error("Global error:", err.message);
@@ -275,7 +327,9 @@ app.use((err, _req, res, _next) => {
     });
 });
 
-/* ================= START ================= */
+/* =====================================================
+   START SERVER
+===================================================== */
 
 const PORT = process.env.PORT || 4242;
 

@@ -46,6 +46,13 @@ const shippingSchema = new mongoose.Schema(
 ===================================================== */
 const orderSchema = new mongoose.Schema(
     {
+        store: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Store",
+            default: null,
+            index: true,
+        },
+
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -166,10 +173,27 @@ const orderSchema = new mongoose.Schema(
 );
 
 /* =====================================================
-   INDEXES
+   BASE INDEXES
 ===================================================== */
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ store: 1, createdAt: -1 });
+
+/* =====================================================
+   PERFORMANCE INDEXES FOR 10K+ ORDERS
+===================================================== */
+
+// Fast analytics filtering
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
+
+// Fast user retention queries
+orderSchema.index({ user: 1, orderStatus: 1 });
+
+// Fast store analytics filtering
+orderSchema.index({ store: 1, orderStatus: 1, createdAt: -1 });
+
+// Fast refund filtering
+orderSchema.index({ refundStatus: 1, createdAt: -1 });
 
 /* =====================================================
    HELPER METHODS

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AdminRoute from "./components/AdminRoute";
 
 /* ===== LAYOUTS ===== */
@@ -18,6 +18,7 @@ import Shop from "./pages/Shop";
 
 /* ===== USER ACCOUNT PAGES ===== */
 import Orders from "./pages/orders";
+import OrderDetails from "./pages/orderDetails";
 import MyWaitlist from "./pages/mywaitlist";
 import Coupons from "./pages/coupons";
 import Wallet from "./pages/wallet";
@@ -41,16 +42,24 @@ import AdminOrders from "./pages/admin/adminorders";
 import AdminWallet from "./pages/admin/AdminWallet";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminCoupons from "./pages/admin/AdminCoupons";
-import AdminTeam from "./pages/admin/AdminTeam"; // ✅ ADDED
+import AdminTeam from "./pages/admin/AdminTeam";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 /* ===============================
    USER ROUTE PROTECTION
 ================================ */
 function PrivateRoute({ children }) {
   const token = localStorage.getItem("token");
+  const location = useLocation();
 
   if (!token) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location }}
+      />
+    );
   }
 
   return children;
@@ -63,20 +72,33 @@ export default function App() {
       {/* ================= STORE ================= */}
       <Route path="/" element={<StoreLayout />}>
 
+        {/* HOME */}
         <Route index element={<Home />} />
 
+        {/* SHOP */}
         <Route path="shop" element={<Shop />} />
         <Route path="products" element={<Products />} />
         <Route path="products/:id" element={<ProductDetails />} />
 
+        {/* AUTH */}
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
 
+        {/* ================= USER PROTECTED ================= */}
         <Route
           path="orders"
           element={
             <PrivateRoute>
               <Orders />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="orders/:id"
+          element={
+            <PrivateRoute>
+              <OrderDetails />
             </PrivateRoute>
           }
         />
@@ -108,13 +130,25 @@ export default function App() {
           }
         />
 
+        {/* CART + CHECKOUT */}
         <Route path="cart" element={<Cart />} />
-        <Route path="checkout" element={<Checkout />} />
+
+        <Route
+          path="checkout"
+          element={
+            <PrivateRoute>
+              <Checkout />
+            </PrivateRoute>
+          }
+        />
+
         <Route path="success" element={<Success />} />
 
+        {/* OTHER PAGES */}
         <Route path="contact" element={<Contact />} />
         <Route path="profiles" element={<Profiles />} />
 
+        {/* POLICIES */}
         <Route path="shipping-policy" element={<ShippingPolicy />} />
         <Route path="refund-policy" element={<ReturnRefundPolicy />} />
         <Route path="privacy-policy" element={<PrivacyPolicy />} />
@@ -136,13 +170,17 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="homepage" element={<HomepageEditor />} />
+        <Route path="users" element={<AdminUsers />} />
         <Route path="products" element={<AdminProducts />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="wallet" element={<AdminWallet />} />
         <Route path="settings" element={<AdminSettings />} />
-        <Route path="team" element={<AdminTeam />} /> {/* ✅ FIXED */}
+        <Route path="team" element={<AdminTeam />} />
       </Route>
+
+      {/* ================= FALLBACK ================= */}
+      <Route path="*" element={<Navigate to="/" replace />} />
 
     </Routes>
   );

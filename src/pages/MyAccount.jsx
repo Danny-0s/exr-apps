@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { userFetch } from "../utils/userFetch";
 import { useNavigate } from "react-router-dom";
+import API_BASE from "../utils/api";
 
 export default function MyAccount() {
     const navigate = useNavigate();
@@ -34,7 +35,6 @@ export default function MyAccount() {
                 method: "POST",
                 body: JSON.stringify({ orderId }),
             });
-
             navigate("/cart");
         } catch {
             alert("Reorder failed");
@@ -47,7 +47,6 @@ export default function MyAccount() {
             await userFetch(`/api/orders/${orderId}/return`, {
                 method: "POST",
             });
-
             alert("Return request submitted");
         } catch {
             alert("Return request failed");
@@ -67,7 +66,6 @@ export default function MyAccount() {
                 if (!orderRes) return;
                 const orderData = await orderRes.json();
                 setOrders(orderData.orders || []);
-
             } catch (err) {
                 console.error(err);
             } finally {
@@ -134,9 +132,7 @@ export default function MyAccount() {
                                 }
                             >
                                 <div>
-                                    <p className="text-sm opacity-60">
-                                        Order ID
-                                    </p>
+                                    <p className="text-sm opacity-60">Order ID</p>
                                     <p className="text-xs opacity-50 break-all">
                                         {order._id}
                                     </p>
@@ -149,7 +145,7 @@ export default function MyAccount() {
                                         {(order.items || []).slice(0, 3).map((item, i) => (
                                             <img
                                                 key={i}
-                                                src={`http://localhost:4242${item.image}`}
+                                                src={`${API_BASE}${item.image}`}
                                                 alt=""
                                                 className="w-12 h-12 object-cover rounded-lg border border-zinc-800"
                                             />
@@ -177,7 +173,7 @@ export default function MyAccount() {
                                 </div>
                             </div>
 
-                            {/* ===== SMOOTH ANIMATED ACCORDION ===== */}
+                            {/* ===== ACCORDION ===== */}
                             <div
                                 className={`transition-all duration-500 ease-in-out overflow-hidden ${isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                                     }`}
@@ -190,7 +186,7 @@ export default function MyAccount() {
                                             className="flex items-center gap-4"
                                         >
                                             <img
-                                                src={`http://localhost:4242${item.image}`}
+                                                src={`${API_BASE}${item.image}`}
                                                 alt=""
                                                 className="w-16 h-16 object-cover rounded-lg"
                                             />
@@ -222,7 +218,6 @@ export default function MyAccount() {
                                         </p>
                                     </div>
 
-                                    {/* ===== ACTION BUTTONS ===== */}
                                     <div className="flex flex-wrap gap-4 pt-4 border-t border-zinc-800">
 
                                         <button
@@ -240,6 +235,7 @@ export default function MyAccount() {
                                                 REQUEST RETURN
                                             </button>
                                         )}
+
                                     </div>
 
                                 </div>

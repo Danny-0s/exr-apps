@@ -1,4 +1,5 @@
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import { useState, useMemo, useEffect } from "react";
 import { formatNPR } from "../utils/formatCurrency";
 import API_BASE_URL from "../utils/api";
@@ -7,8 +8,9 @@ const KATHMANDU_VALLEY_CITIES = ["kathmandu", "lalitpur", "bhaktapur"];
 
 export default function Checkout() {
     const { cart, clearCart } = useCart();
-    const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
 
+    const [loading, setLoading] = useState(false);
     const [settings, setSettings] = useState(null);
     const [settingsLoading, setSettingsLoading] = useState(true);
 
@@ -26,7 +28,6 @@ export default function Checkout() {
         const fetchSettings = async () => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/settings`);
-                if (!res.ok) throw new Error();
                 const data = await res.json();
                 setSettings(data);
             } catch (err) {
@@ -38,13 +39,7 @@ export default function Checkout() {
         fetchSettings();
     }, []);
 
-    if (cart.length === 0) {
-        return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center opacity-60">
-                YOUR CART IS EMPTY
-            </div>
-        );
-    }
+    /* ================= CALCULATIONS ================= */
 
     const subtotal = useMemo(
         () => cart.reduce((sum, i) => sum + i.price * i.quantity, 0),
@@ -56,12 +51,26 @@ export default function Checkout() {
         if (!shipping.city.trim()) return 0;
 
         const city = shipping.city.trim().toLowerCase();
+
         return KATHMANDU_VALLEY_CITIES.includes(city)
             ? settings?.shippingInsideValley ?? 150
             : settings?.shippingOutsideValley ?? 300;
     }, [shipping.city, subtotal, settings]);
 
     const grandTotal = subtotal + shippingFee;
+
+    /* ================= WELCOME DISCOUNT UI ================= */
+
+    const welcomeDiscount = useMemo(() => {
+        if (!user) return 0;
+        if (user.welcomeDiscountUsed) return 0;
+
+        return Math.round(subtotal * 0.2);
+    }, [user, subtotal]);
+
+    const finalTotal = grandTotal - welcomeDiscount;
+
+    /* ================= VALIDATION ================= */
 
     const validateShipping = () => {
         const required = [
@@ -76,10 +85,21 @@ export default function Checkout() {
             alert("Please fill all required shipping details");
             return false;
         }
+
         return true;
     };
 
-    const createOrder = async paymentMethod => {
+    /* ================= CREATE ORDER (SECURE) ================= */
+
+    const createOrder = async (paymentMethod) => {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            alert("Please login first");
+            window.location.href = "/login";
+            return;
+        }
+
         const orderItems = cart.map(item => ({
             _id: item._id || item.id,
             title: item.title,
@@ -92,11 +112,11 @@ export default function Checkout() {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
                 items: orderItems,
                 shipping,
-                totalAmount: grandTotal,
                 paymentMethod,
             }),
         });
@@ -110,15 +130,19 @@ export default function Checkout() {
         return await res.json();
     };
 
+    /* ================= PAYMENT HANDLERS ================= */
+
     const handleCOD = async () => {
         if (!validateShipping()) return;
         setLoading(true);
+
         try {
             await createOrder("cod");
             clearCart();
             window.location.href = "/success";
         } catch {
             alert("Cash on Delivery failed");
+        } finally {
             setLoading(false);
         }
     };
@@ -126,6 +150,7 @@ export default function Checkout() {
     const handleStripe = async () => {
         if (!validateShipping()) return;
         setLoading(true);
+
         try {
             const { orderId } = await createOrder("stripe");
 
@@ -142,6 +167,7 @@ export default function Checkout() {
             window.location.href = data.url;
         } catch {
             alert("Stripe payment failed");
+        } finally {
             setLoading(false);
         }
     };
@@ -149,6 +175,7 @@ export default function Checkout() {
     const handleEsewa = async () => {
         if (!validateShipping()) return;
         setLoading(true);
+
         try {
             const { orderId } = await createOrder("esewa");
 
@@ -157,8 +184,8 @@ export default function Checkout() {
             form.action = "https://uat.esewa.com.np/epay/main";
 
             const fields = {
-                amt: grandTotal,
-                tAmt: grandTotal,
+                amt: finalTotal,
+                tAmt: finalTotal,
                 pid: orderId,
                 scd: "EPAYTEST",
                 su: `${window.location.origin}/success?orderId=${orderId}&payment=esewa`,
@@ -177,6 +204,7 @@ export default function Checkout() {
             form.submit();
         } catch {
             alert("eSewa payment failed");
+        } finally {
             setLoading(false);
         }
     };
@@ -184,6 +212,7 @@ export default function Checkout() {
     const handleKhalti = async () => {
         if (!validateShipping()) return;
         setLoading(true);
+
         try {
             const { orderId } = await createOrder("khalti");
 
@@ -200,90 +229,110 @@ export default function Checkout() {
             window.location.href = data.payment_url;
         } catch {
             alert("Khalti payment failed");
+        } finally {
             setLoading(false);
         }
     };
 
+    /* ================= UI ================= */
+
     return (
-        <div className="min-h-screen bg-black text-white px-8 py-12 max-w-5xl mx-auto">
-            <h1 className="text-2xl tracking-widest mb-10">
+        <div className="min-h-screen bg-black text-white px-4 sm:px-8 md:px-16 py-12 max-w-6xl mx-auto">
+
+            <h1 className="text-2xl sm:text-3xl tracking-widest mb-10">
                 CHECKOUT
             </h1>
 
-            <div className="border border-zinc-800 p-6 mb-10 space-y-4">
-                {["fullName", "phone", "address", "city", "province"].map(field => (
-                    <input
-                        key={field}
-                        placeholder={`${field.replace(/([A-Z])/g, " $1")} *`}
-                        className="w-full bg-black border border-zinc-700 p-3"
-                        value={shipping[field]}
-                        onChange={e =>
-                            setShipping({
-                                ...shipping,
-                                [field]: e.target.value,
-                            })
-                        }
-                    />
-                ))}
-            </div>
+            <div className="grid md:grid-cols-2 gap-12">
 
-            <div className="space-y-3 mb-10 text-sm">
-                <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>{formatNPR(subtotal)}</span>
+                {/* SHIPPING FORM */}
+                <div className="border border-zinc-800 p-6 space-y-4">
+                    {["fullName", "phone", "address", "city", "province"].map(field => (
+                        <input
+                            key={field}
+                            placeholder={`${field.replace(/([A-Z])/g, " $1")} *`}
+                            className="w-full bg-black border border-zinc-700 p-3 text-sm sm:text-base"
+                            value={shipping[field]}
+                            onChange={e =>
+                                setShipping({
+                                    ...shipping,
+                                    [field]: e.target.value,
+                                })
+                            }
+                        />
+                    ))}
                 </div>
 
-                <div className="flex justify-between">
-                    <span>Shipping</span>
-                    <span>{shippingFee === 0 ? "FREE" : formatNPR(shippingFee)}</span>
+                {/* ORDER SUMMARY */}
+                <div className="space-y-6">
+
+                    <div className="space-y-3 text-sm sm:text-base">
+                        <div className="flex justify-between">
+                            <span>Subtotal</span>
+                            <span>{formatNPR(subtotal)}</span>
+                        </div>
+
+                        <div className="flex justify-between">
+                            <span>Shipping</span>
+                            <span>{shippingFee === 0 ? "FREE" : formatNPR(shippingFee)}</span>
+                        </div>
+
+                        {welcomeDiscount > 0 && (
+                            <div className="flex justify-between text-green-400">
+                                <span>Welcome 20% Discount</span>
+                                <span>- {formatNPR(welcomeDiscount)}</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between text-xl border-t border-zinc-800 pt-4">
+                            <span>TOTAL</span>
+                            <span>{formatNPR(finalTotal)}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4">
+                        {settings?.codEnabled && (
+                            <button
+                                onClick={handleCOD}
+                                disabled={loading}
+                                className="border border-white px-6 py-3 tracking-widest hover:bg-white hover:text-black transition"
+                            >
+                                CASH ON DELIVERY
+                            </button>
+                        )}
+
+                        {settings?.stripeEnabled && (
+                            <button
+                                onClick={handleStripe}
+                                disabled={loading}
+                                className="border border-white px-6 py-3 tracking-widest hover:bg-white hover:text-black transition"
+                            >
+                                PAY WITH STRIPE
+                            </button>
+                        )}
+
+                        {settings?.esewaEnabled && (
+                            <button
+                                onClick={handleEsewa}
+                                disabled={loading}
+                                className="border border-white px-6 py-3 tracking-widest hover:bg-green-500 hover:text-black transition"
+                            >
+                                PAY WITH ESEWA
+                            </button>
+                        )}
+
+                        {settings?.khaltiEnabled && (
+                            <button
+                                onClick={handleKhalti}
+                                disabled={loading}
+                                className="border border-white px-6 py-3 tracking-widest hover:bg-purple-600 hover:text-white transition"
+                            >
+                                PAY WITH KHALTI
+                            </button>
+                        )}
+                    </div>
+
                 </div>
-
-                <div className="flex justify-between text-xl border-t border-zinc-800 pt-4">
-                    <span>TOTAL</span>
-                    <span>{formatNPR(grandTotal)}</span>
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-                {settings?.codEnabled && (
-                    <button
-                        onClick={handleCOD}
-                        disabled={loading}
-                        className="border border-white px-10 py-4 tracking-widest hover:bg-white hover:text-black transition"
-                    >
-                        CASH ON DELIVERY
-                    </button>
-                )}
-
-                {settings?.stripeEnabled && (
-                    <button
-                        onClick={handleStripe}
-                        disabled={loading}
-                        className="border border-white px-10 py-4 tracking-widest hover:bg-white hover:text-black transition"
-                    >
-                        PAY WITH STRIPE
-                    </button>
-                )}
-
-                {settings?.esewaEnabled && (
-                    <button
-                        onClick={handleEsewa}
-                        disabled={loading}
-                        className="border border-white px-10 py-4 tracking-widest hover:bg-green-500 hover:text-black transition"
-                    >
-                        PAY WITH ESEWA
-                    </button>
-                )}
-
-                {settings?.khaltiEnabled && (
-                    <button
-                        onClick={handleKhalti}
-                        disabled={loading}
-                        className="border border-white px-10 py-4 tracking-widest hover:bg-purple-600 hover:text-white transition"
-                    >
-                        PAY WITH KHALTI
-                    </button>
-                )}
             </div>
         </div>
     );

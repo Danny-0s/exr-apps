@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE from "../utils/api";
 
 export default function Shop() {
     const [products, setProducts] = useState([]);
@@ -8,14 +9,13 @@ export default function Shop() {
     const [search, setSearch] = useState("");
     const [category, setCategory] = useState("All");
 
-    /* ❤️ LOCAL WAITLIST */
     const [waitlisted, setWaitlisted] = useState([]);
 
     /* ================= LOAD PRODUCTS ================= */
     useEffect(() => {
         const load = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/products");
+                const res = await fetch(`${API_BASE}/api/products`);
                 const data = await res.json();
                 setProducts(Array.isArray(data) ? data : []);
             } catch (err) {
@@ -74,7 +74,6 @@ export default function Shop() {
         });
     }, [products, search, category]);
 
-    /* ================= LOADING ================= */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -83,7 +82,6 @@ export default function Shop() {
         );
     }
 
-    /* ================= RENDER ================= */
     return (
         <div className="min-h-screen bg-black text-white px-6 md:px-20 py-32">
             <div className="max-w-7xl mx-auto">
@@ -145,14 +143,10 @@ export default function Shop() {
                                     to={`/products/${product._id}`}
                                     className="group relative border border-zinc-800 p-4 hover:border-white transition"
                                 >
-                                    {/* ❤️ WAITLIST */}
                                     {showHeart && (
                                         <button
                                             onClick={e =>
-                                                toggleWaitlist(
-                                                    e,
-                                                    product._id
-                                                )
+                                                toggleWaitlist(e, product._id)
                                             }
                                             className={`absolute top-3 right-3 z-10 text-xl transition ${isWaitlisted
                                                     ? "text-red-500"
@@ -166,7 +160,7 @@ export default function Shop() {
                                     <div className="aspect-square bg-zinc-900 mb-4 overflow-hidden">
                                         {image ? (
                                             <img
-                                                src={`http://localhost:4242${image}`}
+                                                src={`${API_BASE}${image}`}
                                                 alt={product.title}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition"
                                             />

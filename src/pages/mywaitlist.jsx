@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { formatNPR } from "../utils/formatCurrency";
+import API_BASE from "../utils/api";
 
 export default function MyWaitlist() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    /* MODAL STATE */
     const [activeProduct, setActiveProduct] = useState(null);
     const [selectedSize, setSelectedSize] = useState(null);
 
@@ -25,7 +25,7 @@ export default function MyWaitlist() {
                 return;
             }
 
-            const res = await fetch("http://localhost:4242/api/products");
+            const res = await fetch(`${API_BASE}/api/products`);
             const allProducts = await res.json();
 
             setProducts(
@@ -52,9 +52,7 @@ export default function MyWaitlist() {
     /* ================= REMOVE ================= */
     const removeFromWaitlist = productId => {
         const stored =
-            JSON.parse(
-                localStorage.getItem("waitlistedProducts")
-            ) || [];
+            JSON.parse(localStorage.getItem("waitlistedProducts")) || [];
 
         localStorage.setItem(
             "waitlistedProducts",
@@ -118,7 +116,7 @@ export default function MyWaitlist() {
                         >
                             <Link to={`/products/${p._id}`}>
                                 <img
-                                    src={`http://localhost:4242${p.images?.[0]}`}
+                                    src={`${API_BASE}${p.images?.[0]}`}
                                     className="w-full h-72 object-cover"
                                     alt={p.title}
                                 />
@@ -146,9 +144,7 @@ export default function MyWaitlist() {
                             {p.stock > 0 && (
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                                     <button
-                                        onClick={() =>
-                                            setActiveProduct(p)
-                                        }
+                                        onClick={() => setActiveProduct(p)}
                                         className="border px-6 py-2 tracking-widest hover:bg-white hover:text-black transition"
                                     >
                                         ADD TO CART
@@ -172,9 +168,7 @@ export default function MyWaitlist() {
                             {activeProduct.sizes.map(size => (
                                 <button
                                     key={size}
-                                    onClick={() =>
-                                        setSelectedSize(size)
-                                    }
+                                    onClick={() => setSelectedSize(size)}
                                     className={`px-4 py-2 border tracking-widest ${selectedSize === size
                                             ? "bg-white text-black border-white"
                                             : "border-zinc-700 hover:border-white"

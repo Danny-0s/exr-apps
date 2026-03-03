@@ -8,50 +8,28 @@ import nodemailer from "nodemailer";
 const router = express.Router();
 
 /* ========================================
-   EMAIL TRANSPORTER
+   SAFE EMAIL TRANSPORTER
 ======================================== */
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+let transporter = null;
+
+if (
+    process.env.EMAIL_HOST &&
+    process.env.EMAIL_USER &&
+    process.env.EMAIL_PASS
+) {
+    transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: Number(process.env.EMAIL_PORT) || 587,
+        secure: false,
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        },
+    });
+}
 
 /* ========================================
-   EMAIL TEMPLATE
-======================================== */
-const refundEmailTemplate = (type, orderId, amount, reason = "") => {
-    if (type === "approved") {
-        return {
-            subject: "Your Refund Has Been Approved 🎉",
-            html: `
-            <div style="font-family:Arial;background:#111;padding:30px;color:#fff;">
-              <h2 style="color:#4ade80;">Refund Approved</h2>
-              <p>Order <b>${orderId}</b></p>
-              <p><b>Amount:</b> NPR ${amount}</p>
-              <p>The amount has been credited to your wallet.</p>
-            </div>
-        `,
-        };
-    }
-
-    return {
-        subject: "Refund Request Rejected",
-        html: `
-        <div style="font-family:Arial;background:#111;padding:30px;color:#fff;">
-          <h2 style="color:#f87171;">Refund Rejected</h2>
-          <p>Order <b>${orderId}</b></p>
-          <p><b>Reason:</b> ${reason}</p>
-        </div>
-        `,
-    };
-};
-
-/* ========================================
-   GET ORDERS (SERVER SIDE PAGINATION)
+   GET ORDERS (FILTER + DATE + PAGINATION)
 ======================================== */
 router.get("/", adminAuth(), async (req, res) => {
     try {
@@ -61,43 +39,43 @@ router.get("/", adminAuth(), async (req, res) => {
             status = "all",
             payment = "all",
             search = "",
+            from,
+            to,
         } = req.query;
-
-        const pageNumber = Number(page);
-        const limitNumber = Number(limit);
 
         const query = {};
 
-        if (status !== "all") {
-            query.orderStatus = status;
+        if (status !== "all") query.orderStatus = status;
+        if (payment !== "all") query.paymentMethod = payment;
+
+        if (search && mongoose.Types.ObjectId.isValid(search)) {
+            query._id = new mongoose.Types.ObjectId(search);
         }
 
-        if (payment !== "all") {
-            query.paymentMethod = payment;
-        }
-
-        if (search) {
-            query._id = { $regex: search, $options: "i" };
+        if (from && to) {
+            query.createdAt = {
+                $gte: new Date(from),
+                $lte: new Date(to + "T23:59:59.999Z"),
+            };
         }
 
         const totalOrders = await Order.countDocuments(query);
 
         const orders = await Order.find(query)
-            .populate("user", "email name")
+            .populate("user", "email name walletBalance")
             .sort({ createdAt: -1 })
-            .skip((pageNumber - 1) * limitNumber)
-            .limit(limitNumber);
+            .skip((page - 1) * limit)
+            .limit(Number(limit));
 
         res.json({
             success: true,
             orders,
             totalOrders,
-            totalPages: Math.ceil(totalOrders / limitNumber),
-            currentPage: pageNumber,
+            totalPages: Math.ceil(totalOrders / limit),
+            currentPage: Number(page),
         });
 
-    } catch (err) {
-        console.error("Admin orders error:", err);
+    } catch {
         res.status(500).json({ error: "Failed to fetch orders" });
     }
 });
@@ -105,9 +83,14 @@ router.get("/", adminAuth(), async (req, res) => {
 /* ========================================
    UPDATE ORDER STATUS
 ======================================== */
-router.patch("/:id/status", adminAuth(), async (req, res) => {
+router.patch("/:orderId/status", adminAuth(), async (req, res) => {
     try {
+        const { orderId } = req.params;
         const { status } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            return res.status(400).json({ error: "Invalid order ID" });
+        }
 
         const allowedStatuses = [
             "pending",
@@ -120,54 +103,42 @@ router.patch("/:id/status", adminAuth(), async (req, res) => {
         ];
 
         if (!allowedStatuses.includes(status)) {
-            return res.status(400).json({ error: "Invalid status" });
+            return res.status(400).json({ error: "Invalid status value" });
         }
 
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "Invalid order ID" });
-        }
-
-        const order = await Order.findById(req.params.id);
+        const order = await Order.findById(orderId);
         if (!order) {
             return res.status(404).json({ error: "Order not found" });
         }
 
         order.orderStatus = status;
 
-        /* ===============================
-           FORCE PAYMENT SYNC
-        ================================ */
-
-        if (status === "paid") {
-            order.paymentStatus = "paid";
-        }
-
-        if (
-            status === "delivered" &&
-            (order.paymentMethod === "cod" ||
-                order.paymentMethod === "cash_on_delivery")
-        ) {
+        // COD auto mark paid when delivered
+        if (status === "delivered" && order.paymentMethod === "cod") {
             order.paymentStatus = "paid";
         }
 
         await order.save();
 
-        res.json({ success: true, order });
+        res.json({
+            success: true,
+            message: "Order status updated",
+        });
 
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    } catch {
+        res.status(500).json({ error: "Status update failed" });
     }
 });
 
 /* ========================================
-   APPROVE REFUND
+   APPROVE REFUND (WALLET CREDIT)
 ======================================== */
 router.put("/refund/:orderId", adminAuth(), async (req, res) => {
-
     const session = await mongoose.startSession();
-    session.startTransaction();
 
     try {
+        session.startTransaction();
+
         const { orderId } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(orderId)) {
@@ -181,101 +152,49 @@ router.put("/refund/:orderId", adminAuth(), async (req, res) => {
             throw new Error("Refund not in requested state");
         }
 
-        /* ===============================
-           UNIVERSAL PAYMENT ELIGIBILITY
-        ================================ */
-
-        const isEligible =
-            order.paymentStatus === "paid" ||
-            order.paymentStatus === "succeeded" ||
-            order.paymentStatus === "completed" ||
-            (
-                (order.paymentMethod === "cod" ||
-                    order.paymentMethod === "cash_on_delivery")
-                &&
-                order.orderStatus === "delivered"
-            );
-
-        if (!isEligible) {
-            throw new Error("Order not eligible for refund");
-        }
-
         const user = await User.findById(order.user).session(session);
         if (!user) throw new Error("User not found");
 
-        /* ===============================
-           CREDIT WALLET
-        ================================ */
-
-        user.walletBalance =
-            (user.walletBalance || 0) + order.totalAmount;
-
-        user.walletTransactions = user.walletTransactions || [];
+        // Credit wallet
+        user.walletBalance += order.totalAmount;
 
         user.walletTransactions.push({
             type: "refund",
             amount: order.totalAmount,
             relatedOrderId: order._id,
-            note: `Refund for order ${order._id}`,
+            note: "Admin approved refund",
             createdAt: new Date(),
         });
 
         await user.save({ session });
 
-        /* ===============================
-           UPDATE ORDER
-        ================================ */
-
-        order.refundStatus = "approved";
-        order.orderStatus = "refunded";
-        order.paymentStatus = "refunded";
-        order.refundedAt = new Date();
-        order.refundedBy = req.admin._id;
-        order.refundAmount = order.totalAmount;
-        order.refundMethod = "wallet";
-
-        order.refundTimeline = order.refundTimeline || [];
-        order.refundTimeline.push({
-            status: "approved",
-            note: "Refund credited to wallet",
-            createdAt: new Date(),
-        });
+        // Update order
+        order.markAsRefunded(
+            req.admin?._id || null,
+            order.totalAmount,
+            "wallet"
+        );
 
         await order.save({ session });
 
         await session.commitTransaction();
         session.endSession();
 
-        /* ===============================
-           SEND EMAIL (SAFE)
-        ================================ */
-        try {
-            const emailContent = refundEmailTemplate(
-                "approved",
-                order._id,
-                order.totalAmount
-            );
-
-            await transporter.sendMail({
+        // Email (non-blocking)
+        if (transporter && user.email) {
+            transporter.sendMail({
                 from: process.env.EMAIL_FROM,
                 to: user.email,
-                subject: emailContent.subject,
-                html: emailContent.html,
-            });
-        } catch {
-            console.log("Email failed but refund completed");
+                subject: "Refund Approved",
+                html: `<h2>Your refund for order ${order._id} has been approved.</h2>`,
+            }).catch(() => { });
         }
 
-        res.json({
-            success: true,
-            message: "Refund approved and wallet credited",
-        });
+        res.json({ success: true });
 
     } catch (err) {
-
         await session.abortTransaction();
         session.endSession();
-
         res.status(400).json({ error: err.message });
     }
 });
@@ -285,8 +204,8 @@ router.put("/refund/:orderId", adminAuth(), async (req, res) => {
 ======================================== */
 router.put("/refund/:orderId/reject", adminAuth(), async (req, res) => {
     try {
-        const { reason } = req.body;
         const { orderId } = req.params;
+        const { reason } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(orderId)) {
             return res.status(400).json({ error: "Invalid order ID" });
@@ -304,47 +223,77 @@ router.put("/refund/:orderId/reject", adminAuth(), async (req, res) => {
         }
 
         order.refundStatus = "rejected";
-        order.refundRejectReason =
-            reason || "Refund request rejected";
-        order.refundedBy = req.admin._id;
+        order.refundRejectReason = reason || "Refund rejected";
+        order.refundedBy = req.admin?._id || null;
 
-        order.refundTimeline = order.refundTimeline || [];
-        order.refundTimeline.push({
-            status: "rejected",
-            note: order.refundRejectReason,
-            createdAt: new Date(),
-        });
+        order.addRefundTimeline("rejected", reason);
 
         await order.save();
 
-        try {
-            const user = await User.findById(order.user);
-            if (user) {
-                const emailContent = refundEmailTemplate(
-                    "rejected",
-                    order._id,
-                    0,
-                    order.refundRejectReason
-                );
+        const user = await User.findById(order.user);
 
-                await transporter.sendMail({
-                    from: process.env.EMAIL_FROM,
-                    to: user.email,
-                    subject: emailContent.subject,
-                    html: emailContent.html,
-                });
-            }
-        } catch {
-            console.log("Reject email failed");
+        if (transporter && user?.email) {
+            transporter.sendMail({
+                from: process.env.EMAIL_FROM,
+                to: user.email,
+                subject: "Refund Rejected",
+                html: `<h2>Your refund for order ${order._id} was rejected.</h2><p>${reason}</p>`,
+            }).catch(() => { });
         }
 
-        res.json({
-            success: true,
-            message: "Refund rejected",
-        });
+        res.json({ success: true });
 
     } catch (err) {
         res.status(400).json({ error: err.message });
+    }
+});
+
+/* ========================================
+   EXPORT CSV
+======================================== */
+router.get("/export", adminAuth(), async (req, res) => {
+    try {
+        const {
+            status = "all",
+            payment = "all",
+            search = "",
+            from,
+            to,
+        } = req.query;
+
+        const query = {};
+
+        if (status !== "all") query.orderStatus = status;
+        if (payment !== "all") query.paymentMethod = payment;
+
+        if (search && mongoose.Types.ObjectId.isValid(search)) {
+            query._id = new mongoose.Types.ObjectId(search);
+        }
+
+        if (from && to) {
+            query.createdAt = {
+                $gte: new Date(from),
+                $lte: new Date(to + "T23:59:59.999Z"),
+            };
+        }
+
+        const orders = await Order.find(query)
+            .populate("user", "name email")
+            .sort({ createdAt: -1 });
+
+        let csv =
+            "Order ID,Customer Name,Customer Email,Amount,Payment Method,Order Status,Refund Status,Created At\n";
+
+        orders.forEach((order) => {
+            csv += `"${order._id}","${order.user?.name || ""}","${order.user?.email || ""}","${order.totalAmount}","${order.paymentMethod}","${order.orderStatus}","${order.refundStatus || "none"}","${order.createdAt}"\n`;
+        });
+
+        res.header("Content-Type", "text/csv");
+        res.attachment("orders-export.csv");
+        res.send(csv);
+
+    } catch {
+        res.status(500).json({ error: "CSV export failed" });
     }
 });
 

@@ -21,11 +21,13 @@ export default function AdminLayout() {
     const logout = () => {
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminRefreshToken");
+        localStorage.removeItem("adminRole");
         navigate("/admin/login");
     };
 
-    const isActive = path =>
-        location.pathname === path
+    // ✅ Improved active detection (supports nested routes)
+    const isActive = (path) =>
+        location.pathname.startsWith(path)
             ? "text-white font-semibold"
             : "text-white/60 hover:text-white";
 
@@ -39,31 +41,60 @@ export default function AdminLayout() {
 
                 <nav className="flex flex-col gap-4 text-sm">
 
+                    {/* DASHBOARD */}
                     <Link to="/admin" className={isActive("/admin")}>
                         Dashboard
                     </Link>
 
-                    <Link to="/admin/products" className={isActive("/admin/products")}>
+                    {/* USERS */}
+                    <Link
+                        to="/admin/users"
+                        className={isActive("/admin/users")}
+                    >
+                        Users
+                    </Link>
+
+                    {/* PRODUCTS */}
+                    <Link
+                        to="/admin/products"
+                        className={isActive("/admin/products")}
+                    >
                         Products
                     </Link>
 
-                    <Link to="/admin/orders" className={isActive("/admin/orders")}>
+                    {/* ORDERS */}
+                    <Link
+                        to="/admin/orders"
+                        className={isActive("/admin/orders")}
+                    >
                         Orders
                     </Link>
 
-                    <Link to="/admin/coupons" className={isActive("/admin/coupons")}>
+                    {/* COUPONS */}
+                    <Link
+                        to="/admin/coupons"
+                        className={isActive("/admin/coupons")}
+                    >
                         Coupons
                     </Link>
 
-                    <Link to="/admin/wallet" className={isActive("/admin/wallet")}>
+                    {/* WALLET */}
+                    <Link
+                        to="/admin/wallet"
+                        className={isActive("/admin/wallet")}
+                    >
                         Wallet
                     </Link>
 
-                    <Link to="/admin/settings" className={isActive("/admin/settings")}>
+                    {/* SETTINGS */}
+                    <Link
+                        to="/admin/settings"
+                        className={isActive("/admin/settings")}
+                    >
                         Settings
                     </Link>
 
-                    {/* 🔥 SUPER ADMIN ONLY */}
+                    {/* SUPER ADMIN ONLY */}
                     {adminRole === "super_admin" && (
                         <Link
                             to="/admin/team"
@@ -73,10 +104,15 @@ export default function AdminLayout() {
                         </Link>
                     )}
 
-                    <Link to="/" className="text-white/60 hover:text-white">
+                    {/* STORE LINK */}
+                    <Link
+                        to="/"
+                        className="text-white/60 hover:text-white"
+                    >
                         View Store
                     </Link>
 
+                    {/* LOGOUT */}
                     <button
                         onClick={logout}
                         className="mt-8 text-left text-red-400 hover:text-red-300"

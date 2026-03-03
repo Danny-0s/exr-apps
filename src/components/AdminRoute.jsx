@@ -7,10 +7,10 @@ export default function AdminRoute({ children }) {
     const [checking, setChecking] = useState(true);
     const [authorized, setAuthorized] = useState(false);
 
-    const token = localStorage.getItem("adminToken");
-
     useEffect(() => {
         const verifyToken = async () => {
+            const token = localStorage.getItem("adminToken");
+
             if (!token) {
                 setAuthorized(false);
                 setChecking(false);
@@ -33,15 +33,15 @@ export default function AdminRoute({ children }) {
 
                 const data = await res.json();
 
-                // ✅ Save role safely
-                if (data.role) {
+                // Save role safely (optional use elsewhere)
+                if (data?.role) {
                     localStorage.setItem("adminRole", data.role);
                 }
 
                 setAuthorized(true);
 
             } catch (err) {
-                // ❌ Token invalid or expired
+                // Token invalid or expired
                 localStorage.removeItem("adminToken");
                 localStorage.removeItem("adminRefreshToken");
                 localStorage.removeItem("adminRole");
@@ -53,9 +53,9 @@ export default function AdminRoute({ children }) {
         };
 
         verifyToken();
-    }, [token]);
+    }, []); // ✅ run only once
 
-    // ⏳ While checking
+    // ⏳ Loading state
     if (checking) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -64,7 +64,7 @@ export default function AdminRoute({ children }) {
         );
     }
 
-    // 🔒 Not authorized
+    // 🔒 Not authorized → go to ADMIN login
     if (!authorized) {
         return (
             <Navigate

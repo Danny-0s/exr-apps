@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FaInstagram, FaTiktok } from "react-icons/fa";
+import API_BASE from "../utils/api";
 
 export default function Profiles() {
     const [profiles, setProfiles] = useState(null);
@@ -10,12 +11,11 @@ export default function Profiles() {
 
         const load = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/homepage");
+                const res = await fetch(`${API_BASE}/api/homepage`);
                 const data = await res.json();
 
                 if (!mounted) return;
 
-                // ✅ CONTACT section is the CMS source
                 const contactSection = (data.sections || []).find(
                     s => s.type === "contact" && s.enabled !== false
                 );
@@ -60,7 +60,6 @@ export default function Profiles() {
         tiktok,
     } = profiles;
 
-    /* ================= RENDER ================= */
     return (
         <div className="min-h-screen bg-black text-white px-6 md:px-20 py-32">
             <div className="max-w-5xl mx-auto text-center">
@@ -78,7 +77,7 @@ export default function Profiles() {
                 >
                     {profileImage && (
                         <img
-                            src={`http://localhost:4242${profileImage}`}
+                            src={`${API_BASE}${profileImage}`}
                             alt="EXR Profile"
                             className="
                                 w-28 h-28 mx-auto rounded-xl mb-6
@@ -112,7 +111,7 @@ export default function Profiles() {
                         </h2>
 
                         <div className="grid md:grid-cols-2 gap-12">
-                            {/* INSTAGRAM */}
+
                             {instagram && (
                                 <a
                                     href={instagram}
@@ -133,7 +132,6 @@ export default function Profiles() {
                                 </a>
                             )}
 
-                            {/* TIKTOK */}
                             {tiktok && (
                                 <a
                                     href={tiktok}
@@ -153,6 +151,7 @@ export default function Profiles() {
                                     </h3>
                                 </a>
                             )}
+
                         </div>
                     </>
                 )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { userFetch } from "../utils/userFetch";
 
 export default function Register() {
     const navigate = useNavigate();
@@ -11,26 +12,20 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const handleRegister = async e => {
+    const handleRegister = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError("");
 
         try {
-            const res = await fetch(
-                "http://localhost:4242/api/auth/register",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        name,
-                        email,
-                        password,
-                    }),
-                }
-            );
+            const res = await userFetch("/api/auth/register", {
+                method: "POST",
+                body: JSON.stringify({
+                    name,
+                    email,
+                    password,
+                }),
+            });
 
             const data = await res.json();
 
@@ -38,12 +33,14 @@ export default function Register() {
                 throw new Error(data.error || "Registration failed");
             }
 
-            // Auto login after register
+            // ✅ Auto login
             localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
 
             navigate("/orders");
+
         } catch (err) {
-            setError(err.message);
+            setError(err.message || "Registration failed");
         } finally {
             setLoading(false);
         }
@@ -102,10 +99,7 @@ export default function Register() {
 
                 <p className="text-sm opacity-60">
                     Already have an account?{" "}
-                    <Link
-                        to="/login"
-                        className="underline"
-                    >
+                    <Link to="/login" className="underline">
                         Login
                     </Link>
                 </p>

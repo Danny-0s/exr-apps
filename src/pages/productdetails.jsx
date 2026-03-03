@@ -12,7 +12,6 @@ export default function ProductDetails() {
     const [loading, setLoading] = useState(true);
     const [selectedSize, setSelectedSize] = useState(null);
     const [activeImage, setActiveImage] = useState(0);
-
     const [isWaitlisted, setIsWaitlisted] = useState(false);
 
     /* ================= FETCH PRODUCT ================= */
@@ -22,6 +21,11 @@ export default function ProductDetails() {
                 const res = await fetch(
                     `${API_BASE_URL}/api/products/${id}`
                 );
+
+                if (!res.ok) {
+                    throw new Error("Failed to fetch product");
+                }
+
                 const data = await res.json();
                 setProduct(data);
 
@@ -31,8 +35,10 @@ export default function ProductDetails() {
                     ) || [];
 
                 setIsWaitlisted(stored.includes(data._id));
+
             } catch (err) {
                 console.error("Failed to load product", err);
+                setProduct(null);
             } finally {
                 setLoading(false);
             }
@@ -41,6 +47,7 @@ export default function ProductDetails() {
         fetchProduct();
     }, [id]);
 
+    /* ================= LOADING ================= */
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -49,6 +56,7 @@ export default function ProductDetails() {
         );
     }
 
+    /* ================= NOT FOUND ================= */
     if (!product) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -57,10 +65,12 @@ export default function ProductDetails() {
         );
     }
 
+    /* ================= SAFE DATA ================= */
     const images = Array.isArray(product.images) ? product.images : [];
     const sizes = Array.isArray(product.sizes) ? product.sizes : [];
     const showWaitlist = product.stock !== 0;
 
+    /* ================= ADD TO CART ================= */
     const handleAddToCart = () => {
         if (!selectedSize) {
             alert("Please select a size");
@@ -77,6 +87,7 @@ export default function ProductDetails() {
         });
     };
 
+    /* ================= WAITLIST ================= */
     const toggleWaitlist = () => {
         const stored =
             JSON.parse(
@@ -101,6 +112,7 @@ export default function ProductDetails() {
         window.dispatchEvent(new Event("waitlist-updated"));
     };
 
+    /* ================= UI ================= */
     return (
         <div className="min-h-screen bg-black text-white px-6 md:px-12 py-16 grid grid-cols-1 md:grid-cols-2 gap-14">
 

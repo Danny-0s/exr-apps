@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
+import { adminFetch } from "../../utils/adminFetch";
 import { formatNPR } from "../../utils/formatCurrency";
 
 const ALL_SIZES = ["S", "M", "L", "XL"];
 
-/* ================= STOCK BADGE ================= */
 const stockBadge = stock => {
     if (stock === 0) return "bg-red-600";
     if (stock <= 5) return "bg-yellow-500";
@@ -13,6 +13,8 @@ const stockBadge = stock => {
 export default function AdminProducts() {
     const [products, setProducts] = useState([]);
     const [images, setImages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
 
     const [form, setForm] = useState({
         title: "",
@@ -23,31 +25,22 @@ export default function AdminProducts() {
         stock: 0,
     });
 
-    const token = localStorage.getItem("adminToken");
-
-    /* ================= LOAD PRODUCTS (ADMIN) ================= */
+    /* ================= LOAD PRODUCTS ================= */
     const loadProducts = async () => {
-        if (!token) return;
-
         try {
-            const res = await fetch(
-                "http://localhost:4242/api/admin/products",
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            setLoading(true);
 
-            if (!res.ok) {
-                throw new Error("Fetch failed");
-            }
+            const res = await adminFetch("/api/admin/products");
+
+            if (!res.ok) throw new Error("Failed to load");
 
             const data = await res.json();
-            setProducts(data || []);
+            setProducts(Array.isArray(data) ? data : []);
         } catch (err) {
-            console.error(err);
+            console.error("Load products error:", err);
             alert("Failed to load admin products");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -59,46 +52,40 @@ export default function AdminProducts() {
     const handleSubmit = async e => {
         e.preventDefault();
 
-        if (!token) {
-            alert("Admin session expired. Please login again.");
-            return;
-        }
-
         if (!images.length) {
             alert("Please select at least one image");
             return;
         }
 
-        const formData = new FormData();
-        formData.append("title", form.title);
-        formData.append("price", Number(form.price));
-        formData.append("category", form.category.toLowerCase());
-        formData.append("featured", form.featured);
-        formData.append("stock", Number(form.stock));
-        formData.append("sizes", JSON.stringify(form.sizes));
-
-        images.forEach(img => formData.append("images", img));
-
         try {
-            const res = await fetch(
-                "http://localhost:4242/api/admin/products",
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: formData,
-                }
-            );
+            setSubmitting(true);
 
-            const data = await res.json();
+            const formData = new FormData();
+            formData.append("title", form.title.trim());
+            formData.append("price", Number(form.price));
+            formData.append("category", form.category.toLowerCase().trim());
+            formData.append("featured", form.featured);
+            formData.append("stock", Number(form.stock));
+            formData.append("sizes", JSON.stringify(form.sizes));
+
+            images.forEach(img => {
+                formData.append("images", img); // MUST be "images"
+            });
+
+            const res = await adminFetch("/api/admin/products", {
+                method: "POST",
+                body: formData,
+            });
 
             if (!res.ok) {
-                alert(data.message || "Failed to create product");
+                const text = await res.text();
+                console.error("Server error:", text);
+                alert("Server error while creating product");
                 return;
             }
 
-            // reset form
+            await res.json(); // safe now
+
             setForm({
                 title: "",
                 price: "",
@@ -107,43 +94,38 @@ export default function AdminProducts() {
                 sizes: [],
                 stock: 0,
             });
-            setImages([]);
 
+            setImages([]);
             loadProducts();
+
         } catch (err) {
-            console.error(err);
+            console.error("Create product error:", err);
             alert("Create product failed");
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    /* ================= DELETE PRODUCT ================= */
     const deleteProduct = async id => {
-        if (!confirm("Delete this product?")) return;
-
-        if (!token) return;
+        if (!window.confirm("Delete this product?")) return;
 
         try {
-            const res = await fetch(
-                `http://localhost:4242/api/admin/products/${id}`,
-                {
-                    method: "DELETE",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+            const res = await adminFetch(
+                `/api/admin/products/${id}`,
+                { method: "DELETE" }
             );
 
-            if (!res.ok) {
-                throw new Error();
-            }
+            if (!res.ok) throw new Error();
 
-            loadProducts();
-        } catch {
+            setProducts(prev =>
+                prev.filter(p => p._id !== id)
+            );
+        } catch (err) {
+            console.error("Delete product error:", err);
             alert("Failed to delete product");
         }
     };
 
-    /* ================= SIZE TOGGLE ================= */
     const toggleSize = size => {
         setForm(prev => ({
             ...prev,
@@ -159,7 +141,6 @@ export default function AdminProducts() {
                 ADMIN → PRODUCTS
             </h1>
 
-            {/* ================= ADD PRODUCT ================= */}
             <form
                 onSubmit={handleSubmit}
                 className="border border-zinc-800 p-6 mb-16 space-y-5"
@@ -199,7 +180,6 @@ export default function AdminProducts() {
                     required
                 />
 
-                {/* SIZES */}
                 <div>
                     <p className="text-xs mb-2 opacity-60">SIZES</p>
                     <div className="flex gap-3">
@@ -208,9 +188,9 @@ export default function AdminProducts() {
                                 type="button"
                                 key={size}
                                 onClick={() => toggleSize(size)}
-                                className={`border px-4 py-2 ${form.sizes.includes(size)
+                                className={`border px-4 py-2 transition ${form.sizes.includes(size)
                                         ? "bg-white text-black"
-                                        : "border-zinc-700"
+                                        : "border-zinc-700 hover:border-white"
                                     }`}
                             >
                                 {size}
@@ -252,48 +232,54 @@ export default function AdminProducts() {
                     className="w-full bg-black border p-3"
                 />
 
-                <button className="border px-8 py-3 hover:bg-white hover:text-black transition">
-                    ADD PRODUCT
+                <button
+                    disabled={submitting}
+                    className="border px-8 py-3 hover:bg-white hover:text-black transition disabled:opacity-50"
+                >
+                    {submitting ? "ADDING..." : "ADD PRODUCT"}
                 </button>
             </form>
 
-            {/* ================= PRODUCT LIST ================= */}
-            <div className="space-y-4">
-                {products.map(p => (
-                    <div
-                        key={p._id}
-                        className="border border-zinc-800 p-4 flex justify-between items-center"
-                    >
-                        <div>
-                            <p className="font-bold">{p.title}</p>
-
-                            <span
-                                className={`inline-block mt-1 px-3 py-1 text-xs rounded ${stockBadge(
-                                    p.stock
-                                )}`}
-                            >
-                                STOCK: {p.stock}
-                            </span>
-
-                            <p className="text-sm opacity-60 mt-1">
-                                {formatNPR(p.price)}
-                                {p.featured && " · FEATURED"}
-                            </p>
-
-                            <p className="text-xs opacity-50">
-                                Sizes: {p.sizes?.join(", ") || "—"}
-                            </p>
-                        </div>
-
-                        <button
-                            onClick={() => deleteProduct(p._id)}
-                            className="text-red-500 text-xs"
+            {loading ? (
+                <p className="opacity-60">Loading products…</p>
+            ) : (
+                <div className="space-y-4">
+                    {products.map(p => (
+                        <div
+                            key={p._id}
+                            className="border border-zinc-800 p-4 flex justify-between items-center"
                         >
-                            DELETE
-                        </button>
-                    </div>
-                ))}
-            </div>
+                            <div>
+                                <p className="font-bold">{p.title}</p>
+
+                                <span
+                                    className={`inline-block mt-1 px-3 py-1 text-xs rounded ${stockBadge(
+                                        p.stock
+                                    )}`}
+                                >
+                                    STOCK: {p.stock}
+                                </span>
+
+                                <p className="text-sm opacity-60 mt-1">
+                                    {formatNPR(p.price)}
+                                    {p.featured && " · FEATURED"}
+                                </p>
+
+                                <p className="text-xs opacity-50">
+                                    Sizes: {p.sizes?.join(", ") || "—"}
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => deleteProduct(p._id)}
+                                className="text-red-500 text-xs hover:underline"
+                            >
+                                DELETE
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

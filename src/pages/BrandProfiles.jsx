@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FaInstagram, FaTiktok } from "react-icons/fa";
+import API_BASE from "../utils/api";
 
 export default function Profiles() {
     const [profileData, setProfileData] = useState(null);
@@ -11,7 +12,7 @@ export default function Profiles() {
 
         const loadProfile = async () => {
             try {
-                const res = await fetch("http://localhost:4242/api/homepage");
+                const res = await fetch(`${API_BASE}/api/homepage`);
 
                 if (!res.ok) {
                     throw new Error("Failed to fetch profile");
@@ -102,7 +103,7 @@ export default function Profiles() {
                 >
                     {profileImage && (
                         <img
-                            src={`http://localhost:4242${profileImage}`}
+                            src={`${API_BASE}${profileImage}`}
                             alt="Brand Profile"
                             onError={(e) => {
                                 e.target.style.display = "none";
@@ -140,7 +141,6 @@ export default function Profiles() {
 
                         <div className="grid md:grid-cols-2 gap-12">
 
-                            {/* INSTAGRAM */}
                             {instagram && (
                                 <a
                                     href={instagram}
@@ -161,7 +161,6 @@ export default function Profiles() {
                                 </a>
                             )}
 
-                            {/* TIKTOK */}
                             {tiktok && (
                                 <a
                                     href={tiktok}

@@ -55,7 +55,7 @@ export default function Home() {
                 <SplitHero />
             </div>
 
-            {/* 🔥 ADMIN CONTROLLED SECTIONS BELOW */}
+            {/* 🔥 ADMIN CONTROLLED SECTIONS */}
             <div className="w-full">
                 {sections
                     .filter(
@@ -70,6 +70,35 @@ export default function Home() {
                         />
                     ))}
             </div>
+
+            {/* 🔥 SMALL END STRIP (QUOTE ONLY) */}
+            <section className="w-full bg-black border-t border-zinc-900 py-20 px-6">
+
+                <div className="max-w-5xl mx-auto text-center">
+
+                    <p className="
+                        font-serif
+                        text-lg
+                        sm:text-xl
+                        md:text-2xl
+                        text-white
+                    ">
+                        “We don't follow trends.
+                        <span className="text-red-500"> We set them.</span>”
+                    </p>
+
+                    <div className="
+                        mt-10
+                        text-xs
+                        tracking-[0.35em]
+                        text-zinc-500
+                    ">
+                        KATHMANDU — EST. 2026
+                    </div>
+
+                </div>
+
+            </section>
 
         </div>
     );

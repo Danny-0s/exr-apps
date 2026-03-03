@@ -79,6 +79,12 @@ const userSchema = new mongoose.Schema(
             required: true,
         },
 
+
+        welcomeDiscountUsed: {
+            type: Boolean,
+            default: false,
+        },
+
         /* ===============================
            ROLE SYSTEM
         ================================ */

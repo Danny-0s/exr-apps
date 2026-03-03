@@ -18,7 +18,7 @@ import Shop from "./pages/Shop";
 
 /* ===== USER ACCOUNT PAGES ===== */
 import Orders from "./pages/orders";
-import OrderDetails from "./pages/orderDetails";
+import OrderDetails from "./pages/OrderDetails";
 import MyWaitlist from "./pages/mywaitlist";
 import Coupons from "./pages/coupons";
 import Wallet from "./pages/wallet";

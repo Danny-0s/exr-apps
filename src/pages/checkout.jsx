@@ -1,5 +1,5 @@
 import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authcontext";
 import { useState, useMemo, useEffect } from "react";
 import { formatNPR } from "../utils/formatCurrency";
 import API_BASE_URL from "../utils/api";

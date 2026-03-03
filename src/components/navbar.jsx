@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext"; // ✅ ADD
+import { useAuth } from "../context/authcontext"; // ✅ ADD
 import { useEffect, useRef, useState } from "react";
 import {
     ShoppingCart,

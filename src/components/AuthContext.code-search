@@ -1,0 +1,39 @@
+# Query: AuthContext
+# ContextLines: 1
+
+8 results - 5 files
+
+src/main.jsx:
+  8  import { CartProvider } from "./context/CartContext";
+  9: import { AuthProvider } from "./context/authcontext";
+  10  
+
+src/components/navbar.jsx:
+  2  import { useCart } from "../context/CartContext";
+  3: import { useAuth } from "../context/authcontext"; // ✅ ADD
+  4  import { useEffect, useRef, useState } from "react";
+
+src/context/authcontext.jsx:
+   2  
+   3: const AuthContext = createContext();
+   4  
+
+  29      return (
+  30:         <authcontext.Provider value={{ user, login, logout }}>
+  31              {!loading && children}
+  32:         </authcontext.Provider>
+  33      );
+
+  36  export function useAuth() {
+  37:     return useContext(authcontext);
+  38  }
+
+src/pages/checkout.jsx:
+  1  import { useCart } from "../context/CartContext";
+  2: import { useAuth } from "../context/authcontext";
+  3  import { useState, useMemo, useEffect } from "react";
+
+src/pages/login.jsx:
+  2  import { useNavigate } from "react-router-dom";
+  3: import { useAuth } from "../context/authcontext";
+  4  import { GoogleLogin } from "@react-oauth/google";
